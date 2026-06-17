@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Pixel VTuber Recorder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,6 +10,7 @@
 <style>
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 :root {
@@ -17,8 +18,9 @@
   --panel: #050505;
   --text: #fff;
   --muted: #8f8f8f;
-  --line: rgba(255,255,255,.22);
+  --line: rgba(255,255,255,.24);
   --green: #00FF00;
+  --warn: #ffcc00;
 }
 
 html, body {
@@ -28,10 +30,11 @@ html, body {
   color: var(--text);
   font-family: "Press Start 2P", monospace;
   font-size: 11px;
+  overscroll-behavior: none;
 }
 
 .app {
-  min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   background: #000;
@@ -41,13 +44,13 @@ html, body {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 100vh;
+  min-height: 100svh;
   background: #000;
   overflow: hidden;
 }
 
 #stage {
-  width: min(100vw, calc(100vh * 16 / 9));
+  width: min(100vw, calc(100svh * 16 / 9));
   max-width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
@@ -78,7 +81,7 @@ html, body {
   border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 h1 {
@@ -95,9 +98,28 @@ h1 {
   line-height: 1.7;
 }
 
+.warning {
+  display: none;
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  padding: 12px;
+  font-size: 8px;
+  line-height: 1.7;
+}
+
+.warning.visible {
+  display: block;
+}
+
 .buttons {
   display: grid;
-  gap: 10px;
+  gap: 9px;
+}
+
+.manual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 button, .download {
@@ -108,16 +130,19 @@ button, .download {
   background: transparent;
   color: #fff;
   font-family: "Press Start 2P", monospace;
-  font-size: 9px;
-  line-height: 1.4;
+  font-size: 8px;
+  line-height: 1.45;
   cursor: pointer;
   text-align: center;
   text-decoration: none;
   transition: background .15s linear, color .15s linear, opacity .15s linear;
+  touch-action: manipulation;
 }
 
 button:hover:not(:disabled),
-.download:hover {
+button:active:not(:disabled),
+.download:hover,
+.download:active {
   background: #fff;
   color: #000;
 }
@@ -184,18 +209,16 @@ input[type="checkbox"] {
   line-height: 1.8;
 }
 
-.mobileHint {
-  display: none;
-}
-
 @media (max-width: 900px) {
   .app {
+    min-height: 100svh;
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .stage {
-    min-height: auto;
-    height: 58vh;
+    min-height: 0;
+    height: 46svh;
   }
 
   #stage {
@@ -206,41 +229,43 @@ input[type="checkbox"] {
   .panel {
     border-left: 0;
     border-top: 1px solid var(--line);
-    min-height: 42vh;
+    min-height: 54svh;
+    padding: 14px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    gap: 12px;
   }
 
   #camera {
-    width: 150px;
+    width: 140px;
     right: 10px;
     bottom: 10px;
-  }
-
-  .mobileHint {
-    display: block;
-  }
-}
-
-@media (max-width: 520px) {
-  html, body {
-    font-size: 10px;
-  }
-
-  .stage {
-    height: 48vh;
-  }
-
-  .panel {
-    padding: 14px;
-    gap: 12px;
   }
 
   h1 {
     font-size: 12px;
   }
 
-  button, .download {
-    padding: 12px 10px;
+  .subtitle {
     font-size: 8px;
+  }
+
+  button, .download {
+    padding: 12px 9px;
+    font-size: 7px;
+  }
+
+  .manual {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .stage {
+    height: 40svh;
+  }
+
+  .panel {
+    min-height: 60svh;
   }
 }
 </style>
@@ -249,7 +274,7 @@ input[type="checkbox"] {
 <main class="app">
   <section class="stage">
     <canvas id="stage" width="1920" height="1080"></canvas>
-    <video id="camera" playsinline muted></video>
+    <video id="camera" playsinline muted autoplay></video>
   </section>
 
   <aside class="panel">
@@ -258,13 +283,24 @@ input[type="checkbox"] {
       <p class="subtitle">preview black / export #00FF00</p>
     </div>
 
+    <div id="warning" class="warning">
+      CAMERA BLOCKED. OPEN THIS PAGE IN SAFARI / CHROME, NOT TELEGRAM IN-APP BROWSER. MANUAL MODE STILL WORKS.
+    </div>
+
     <div class="buttons">
-      <button id="btnStart">START CAMERA</button>
-      <button id="btnRecord" disabled>REC</button>
-      <button id="btnStop" disabled>STOP</button>
+      <button id="btnStart" type="button">START CAMERA</button>
+      <button id="btnRecord" type="button">REC</button>
+      <button id="btnStop" type="button" disabled>STOP</button>
     </div>
 
     <a id="download" class="download hidden" download>DOWNLOAD VIDEO</a>
+
+    <div class="manual">
+      <button data-manual="static" type="button">STATIC</button>
+      <button data-manual="open_mouth" type="button">MOUTH</button>
+      <button data-manual="brows" type="button">BROWS</button>
+      <button data-manual="surprised" type="button">WOW</button>
+    </div>
 
     <label class="control">
       SIZE
@@ -294,8 +330,8 @@ input[type="checkbox"] {
     </div>
 
     <p class="note">
-      Use GitHub Pages or localhost. The preview stays black. The recorded file uses green background only.
-      <span class="mobileHint"> On mobile, allow camera and mic permissions.</span>
+      Mobile fix: camera and mic are requested together. If iPhone blocks access, open in Safari from the share menu.
+      Recorded video uses green background only.
     </p>
   </aside>
 </main>
@@ -307,9 +343,12 @@ import {
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
 const SPRITE_URLS = {"open_mouth": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaAAAAGQCAYAAADoTLT0AAAQx0lEQVR4Ae3dsW0dVxAF0E+ZEOBSBLEJRq7AAStkoAoUsQkC6kWA/e1YivRGwOydOc5s6O2bOfdbFxvt7eYfAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIEJgg8DBhCTvsFXh+ut33bp+/+dv7zd9B+TEeb/Dh+KSDBAgQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCCqiA5ygBAgQInAsooHM7JwkQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCCqiA5ygBAgQInAsooHM7JwkQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCCqiA5ygBAgQInAsooHM7JwkQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCvsVRwHP0dvM9Hr+CTgHfE+rUr9/tDahu6AkECBAgcCCggA7QHCFAgACBuoACqht6AgECBAgcCCigAzRHCBAgQKAuoIDqhp5AgAABAgcCCugAzRECBAgQqAsooLqhJxAgQIDAgYACOkBzhAABAgTqAgqobugJBAgQIHAgoIAO0BwhQIAAgbqAAqobegIBAgQIHAgooAM0RwgQIECgLqCA6oaeQIAAAQIHAgroAM0RAgQIEKgLKKC6oScQIECAwIHA48EZRwYJ+J7PoDCtQiBMwBtQWGDGJUCAwBQBBTQlSXsQIEAgTEABhQVmXAIECEwRUEBTkrQHAQIEwgQUUFhgxiVA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", "brows": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaAAAAGQCAYAAADoTLT0AAARHElEQVR4Ae3dMY5kZdIF0CwotcRSWvQm2mIFGLXCMlgBVm+iJfaCNFMzEgI7M+KhyPvF+Z35jYz3Is6t5iqtvN38HwECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAicIPBywhFu2Cvw9cvtY+/1+Zd/+37z36D8GMsX/FCeNEiAAAECBBoCCqiBZ5QAAQIE6gIKqG5nkgABAgQaAgqogWeUAAECBOoCCqhuZ5IAAQIEGgIKqIFnlAABAgTqAgqobmeSAAECBBoCCqiBZ5QAAQIE6gIKqG5nkgABAgQaAgqogWeUAAECBOoCCqhuZ5IAAQIEGgIKqIFnlAABAgTqAgqobmeSAAECBBoCCqiBZ5QAAQIE6gIKqG5nkgABAgQaAn6Lo4Fn9Hbzezz+CiYF/J7QpH7/3b4B9Q09gQABAgQKAgqogGaEAAECBPoCCqhv6AkECBAgUBBQQAU0IwQIECDQF1BAfUNPIECAAIGCgAIqoBkhQIAAgb6AAuobegIBAgQIFAQUUAHNCAECBAj0BRRQ39ATCBAgQKAgoIAKaEYIECBAoC+ggPqGnkCAAAECBQEFVEAzQoAAAQJ9AQXUN/QEAgQIECgIKKACmhECBAgQ6AsooL6hJxAgQIBAQeC1MGPkIAG/53NQmE4hECbgG1BYYNYlQIDAKQIK6JQk3UGAAIEwAQUUFph1CRAgcIqAAjolSXcQIEAgTEABhQVmXQIE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", "surprised": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaAAAAGQCAYAAADoTLT0AAARHUlEQVR4Ae3dMY4d1xEF0D/ygICXQpibYOQVOJgVTqAVKOImCHAvBOyxDDhT0nrVUP1bdRQK/fpVnUvq4ivpx8M/BAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIDBB4GXCEnbYK/D1y+Nj7/b5m3/7/vDfoPwYjzf45fikgwQIECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAgqogOcoAQIECJwLKKBzOycJECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAgqogOcoAQIECJwLKKBzOycJECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAgqogOcoAQIECJwLKKBzOycJECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAr7FUcBz9PHwPR5/CjoFfE+oU79+t19AdUNvIECAAIEDAQV0gOYIAQIECNQFFFDd0BsIECBA4EBAAR2gOUKAAAECdQEFVDf0BgIECBA4EFBAB2iOECBAgEBdQAHVDb2BAAECBA4EFNABmiMECBAgUBdQQHVDbyBAgACBAwEFdIDmCAECBAjUBRRQ3dAbCBAgQOBAQAEdoDlCgAABAnUBBVQ39AYCBAgQOBBQQAdojhAgQIBAXUAB1Q29gQABAgQOBF4PzjgySMD3fAaFaRUCYQJ+AYUFZlwCBAhMEVBAU5K0BwECBMIEFFBYYMYlQIDAFAEFNCVJexAgQCBMQAGF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", "static": "data:image/png;base64,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fgIECAwVUEBDg7c2AQIEugUUUHcC7idAgMBQAQU0NHhrEyBAoFtAAXUn4H4CBAgMFVBAQ4O3NgECBLoFFFB3Au4nQIDAUIHXoXtb+yYC6d/zqTJW9+/+nlB1f+dnC/gFNDt/2xMgQKBNQAG10buYAAECswUU0Oz8bU+AAIE2AQXURu9iAgQIzBZQQLPztz0BAgTaBBRQG72LCRAgMFtAAc3O3/YECBBoE1BAbfQuJkCAwGwBBTQ7f9sTIECgTUABtdG7mAABArMFFNDs/G1PgACBNgEF1EbvYgIECMwWUECz87c9AQIE2gQUUBu9iwkQIDBbQAHNzt/2BAgQaBN4abvZxbcQ+Pjh8d45yLfvD3+DhQDkV8BztF3AL6D2CAxAgACBmQIKaGbutiZAgEC7gAJqj8AABAgQmCmggGbmbmsCBAi0Cyig9ggMQIAAgZkCCmhm7rYmQIBAu4ACao/AAAQIEJgpoIBm5m5rAgQItAsooPYIDECAAIGZAgpoZu62JkCAQLuAAmqPwAAECBCYKaCAZuZuawIECLQLKKD2CAxAgACBmQIKaGbutiZAgEC7gAJqj8AABAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBHIF/gHKyl83ZLApSAAAAABJRU5ErkJggg=="};
+const EXPORT_GREEN = "#00FF00";
+const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
 
 const canvas = document.querySelector("#stage");
 const ctx = canvas.getContext("2d", { alpha: false });
+
 const recordCanvas = document.createElement("canvas");
 recordCanvas.width = 1920;
 recordCanvas.height = 1080;
@@ -321,6 +360,7 @@ const btnStart = document.querySelector("#btnStart");
 const btnRecord = document.querySelector("#btnRecord");
 const btnStop = document.querySelector("#btnStop");
 const download = document.querySelector("#download");
+const warning = document.querySelector("#warning");
 
 const statusEl = document.querySelector("#status");
 const emotionEl = document.querySelector("#emotion");
@@ -331,12 +371,9 @@ const moveInput = document.querySelector("#move");
 const smoothInput = document.querySelector("#smooth");
 const showCameraInput = document.querySelector("#showCamera");
 
-const EXPORT_GREEN = "#00FF00";
-const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
-
 let sprites = {};
 let faceLandmarker = null;
-let cameraStream = null;
+let userStream = null;
 let micStream = null;
 let audioCtx = null;
 let analyser = null;
@@ -350,12 +387,19 @@ let lastVideoTime = -1;
 let currentEmotion = "static";
 let stableEmotion = "static";
 let stableSince = performance.now();
+let manualMode = true;
+let cameraReady = false;
 
 let head = { x: 0, y: 0 };
 let smoothHead = { x: 0, y: 0 };
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function showWarning(text) {
+  warning.textContent = text;
+  warning.classList.add("visible");
 }
 
 function loadImage(src) {
@@ -376,7 +420,7 @@ function makeBlackBackgroundTransparent(img) {
   c.width = img.naturalWidth || img.width;
   c.height = img.naturalHeight || img.height;
 
-  const cctx = c.getContext("2d");
+  const cctx = c.getContext("2d", { willReadFrequently: true });
   cctx.imageSmoothingEnabled = false;
   cctx.drawImage(img, 0, 0);
 
@@ -425,8 +469,6 @@ function makeBlackBackgroundTransparent(img) {
 }
 
 async function loadSprites() {
-  setStatus("LOAD SPRITES");
-
   const loaded = {};
 
   for (const [name, url] of Object.entries(SPRITE_URLS)) {
@@ -460,7 +502,7 @@ function chooseSprite(result, volume) {
   const b = result?.faceBlendshapes?.[0];
 
   if (!b) {
-    return volume > 0.07 ? "open_mouth" : "static";
+    return volume > 0.07 ? "open_mouth" : stableEmotion;
   }
 
   const jawOpen = getBlend(b, "jawOpen");
@@ -533,6 +575,8 @@ function render(targetCtx, w, h, bg) {
 }
 
 async function initFaceLandmarker() {
+  if (faceLandmarker) return;
+
   setStatus("LOAD MEDIAPIPE");
 
   const vision = await FilesetResolver.forVisionTasks(
@@ -550,40 +594,54 @@ async function initFaceLandmarker() {
   });
 }
 
-async function initStreams() {
+async function initCameraAndMic() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("CAMERA API IS NOT AVAILABLE IN THIS BROWSER");
+  }
+
+  if (!window.isSecureContext) {
+    throw new Error("OPEN THROUGH HTTPS OR LOCALHOST");
+  }
+
   setStatus("ASK CAMERA");
 
-  cameraStream = await navigator.mediaDevices.getUserMedia({
+  // Mobile fix: request video and audio in ONE permission request.
+  userStream = await navigator.mediaDevices.getUserMedia({
     video: {
       width: { ideal: 1280 },
       height: { ideal: 720 },
       facingMode: "user"
     },
-    audio: false
-  });
-
-  micStream = await navigator.mediaDevices.getUserMedia({
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true
-    },
-    video: false
+    }
   });
 
-  video.srcObject = cameraStream;
+  video.srcObject = userStream;
   await video.play();
 
+  const audioTracks = userStream.getAudioTracks();
+  micStream = new MediaStream(audioTracks);
+
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const source = audioCtx.createMediaStreamSource(micStream);
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 512;
-  source.connect(analyser);
-  audioData = new Uint8Array(analyser.frequencyBinCount);
+  await audioCtx.resume();
+
+  if (audioTracks.length) {
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    audioData = new Uint8Array(analyser.frequencyBinCount);
+  }
+
+  cameraReady = true;
+  manualMode = false;
 }
 
 function loop() {
-  if (video.readyState >= 2 && video.currentTime !== lastVideoTime && faceLandmarker) {
+  if (cameraReady && video.readyState >= 2 && video.currentTime !== lastVideoTime && faceLandmarker) {
     lastVideoTime = video.currentTime;
 
     const result = faceLandmarker.detectForVideo(video, performance.now());
@@ -624,12 +682,12 @@ function startRecording() {
   download.removeAttribute("href");
 
   const canvasStream = recordCanvas.captureStream(30);
-  const tracks = [
+  const audioTracks = micStream ? micStream.getAudioTracks() : [];
+  const mixed = new MediaStream([
     ...canvasStream.getVideoTracks(),
-    ...micStream.getAudioTracks()
-  ];
+    ...audioTracks
+  ]);
 
-  const mixed = new MediaStream(tracks);
   recordingMime = selectMimeType();
 
   const options = recordingMime ? { mimeType: recordingMime } : undefined;
@@ -665,24 +723,36 @@ function startRecording() {
 btnStart.addEventListener("click", async () => {
   try {
     btnStart.disabled = true;
+    warning.classList.remove("visible");
 
     await loadSprites();
     await initFaceLandmarker();
-    await initStreams();
+    await initCameraAndMic();
 
-    btnRecord.disabled = false;
     setStatus("CAMERA ON");
-
-    loop();
   } catch (error) {
     console.error(error);
-    setStatus("ERROR");
+    cameraReady = false;
+    manualMode = true;
     btnStart.disabled = false;
-    alert(error.message);
+
+    setStatus("MANUAL MODE");
+
+    const msg = String(error && error.message ? error.message : error);
+    showWarning(
+      msg + ". Open in Safari/Chrome directly, not inside Telegram. You can still record manual mode."
+    );
   }
 });
 
-btnRecord.addEventListener("click", startRecording);
+btnRecord.addEventListener("click", () => {
+  try {
+    startRecording();
+  } catch (error) {
+    console.error(error);
+    showWarning("RECORD ERROR: " + error.message);
+  }
+});
 
 btnStop.addEventListener("click", () => {
   if (recorder && recorder.state !== "inactive") recorder.stop();
@@ -692,11 +762,21 @@ showCameraInput.addEventListener("change", () => {
   video.classList.toggle("visible", showCameraInput.checked);
 });
 
-loadSprites().then(() => {
-  stableEmotion = "static";
-  render(ctx, canvas.width, canvas.height, "#000000");
-  render(recordCtx, recordCanvas.width, recordCanvas.height, EXPORT_GREEN);
+document.querySelectorAll("[data-manual]").forEach(button => {
+  button.addEventListener("click", () => {
+    stableEmotion = button.dataset.manual;
+    currentEmotion = stableEmotion;
+    head.x = 0;
+    head.y = 0;
+  });
 });
+
+await loadSprites();
+stableEmotion = "static";
+render(ctx, canvas.width, canvas.height, "#000000");
+render(recordCtx, recordCanvas.width, recordCanvas.height, EXPORT_GREEN);
+loop();
+setStatus("READY");
 </script>
 </body>
 </html>
