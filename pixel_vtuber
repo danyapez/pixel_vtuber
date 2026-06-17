@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel VTuber Recorder</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#111;color:#f5f5f5;font-family:Arial,sans-serif}
+.app{min-height:100vh;display:grid;grid-template-columns:1fr 360px}
+.stage{position:relative;display:grid;place-items:center;background:#050505;overflow:hidden}
+#stage{width:min(100vw,calc(100vh * 16 / 9));max-width:100%;aspect-ratio:16/9;background:#000;image-rendering:pixelated;image-rendering:crisp-edges}
+#camera{position:absolute;right:16px;bottom:16px;width:220px;height:124px;object-fit:cover;border:1px solid rgba(255,255,255,.25);border-radius:10px;transform:scaleX(-1);display:none;background:#000}
+#camera.visible{display:block}
+.panel{padding:22px;background:#191919;border-left:1px solid rgba(255,255,255,.08)}
+h1{margin:0 0 18px;font-size:22px;line-height:1.2}
+.row{display:grid;gap:10px;margin-bottom:16px}
+button,.download{width:100%;border:0;border-radius:12px;padding:12px 14px;background:#fff;color:#111;font-weight:700;cursor:pointer;text-align:center;text-decoration:none}
+button:disabled{opacity:.45;cursor:not-allowed}
+.download{display:block;margin:0 0 16px;background:#32d583}
+.hidden{display:none!important}
+label{display:grid;gap:8px;margin:16px 0;color:#d8d8d8;font-size:14px}
+input[type=range]{width:100%}
+.check{grid-template-columns:20px 1fr;align-items:center}
+.status{margin-top:20px;padding:14px;border-radius:12px;background:rgba(255,255,255,.06);font-size:14px;line-height:1.7}
+.note{margin-top:18px;color:#aaa;font-size:13px;line-height:1.5}
+@media(max-width:900px){.app{grid-template-columns:1fr}.panel{border-left:0;border-top:1px solid rgba(255,255,255,.08)}}
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="stage">
+    <canvas id="stage" width="1920" height="1080"></canvas>
+    <video id="camera" playsinline muted></video>
+  </section>
+
+  <aside class="panel">
+    <h1>Pixel VTuber Recorder</h1>
+
+    <div class="row">
+      <button id="btnStart">1. Включить камеру</button>
+      <button id="btnRecord" disabled>2. Начать запись</button>
+      <button id="btnStop" disabled>3. Стоп</button>
+    </div>
+
+    <a id="download" class="download hidden" download>Скачать видео</a>
+
+    <label>
+      Масштаб персонажа
+      <input id="scale" type="range" min="12" max="44" value="28">
+    </label>
+
+    <label>
+      Сглаживание движения
+      <input id="smooth" type="range" min="0" max="95" value="75">
+    </label>
+
+    <label class="check">
+      <input id="showGrid" type="checkbox">
+      показать сетку персонажа
+    </label>
+
+    <label class="check">
+      <input id="showCamera" type="checkbox">
+      показать камеру для проверки
+    </label>
+
+    <label class="check">
+      <input id="blackBg" type="checkbox" checked>
+      чёрный фон в записи
+    </label>
+
+    <div class="status">
+      <div>Статус: <span id="status">ожидание</span></div>
+      <div>Эмоция: <span id="emotion">neutral</span></div>
+      <div>Формат: <span id="format">—</span></div>
+    </div>
+
+    <p class="note">
+      Камера работает на localhost или HTTPS. Для GitHub Pages подходит. 
+      Если открыть файл двойным кликом, браузер может заблокировать камеру.
+    </p>
+  </aside>
+</main>
+
+<script type="module">
+import {
+  FaceLandmarker,
+  FilesetResolver
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+
+const SPRITE_W = 26;
+const SPRITE_H = 25;
+
+const PALETTE = {
+  ".": null,
+  "H": "#403000",
+  "S": "#FFD9A3",
+  "B": "#0800B8",
+  "M": "#020202",
+  "R": "#C93A3A"
+};
+
+function blank(){
+  return Array.from({length:SPRITE_H},()=>Array(SPRITE_W).fill("."));
+}
+
+function rect(g,y1,y2,x1,x2,ch){
+  for(let y=y1;y<=y2;y++){
+    for(let x=x1;x<=x2;x++){
+      if(y>=0&&y<SPRITE_H&&x>=0&&x<SPRITE_W) g[y][x]=ch;
+    }
+  }
+}
+
+function clone(g){
+  return g.map(r=>r.slice());
+}
+
+function pack(g){
+  return g.map(r=>r.join(""));
+}
+
+function makeBase(){
+  const g = blank();
+
+  rect(g,2,2,10,15,"H");
+  rect(g,3,3,8,17,"H");
+  rect(g,4,4,7,18,"H");
+  rect(g,5,7,6,19,"H");
+
+  rect(g,8,8,6,19,"H");
+  rect(g,8,8,8,17,"S");
+
+  rect(g,9,9,5,20,"H");
+  rect(g,9,9,8,17,"S");
+
+  rect(g,10,10,5,20,"H");
+  rect(g,10,10,8,17,"S");
+
+  rect(g,11,11,6,19,"H");
+  rect(g,11,11,8,17,"S");
+
+  rect(g,12,12,6,19,"H");
+  rect(g,12,12,8,11,"S");
+  rect(g,12,12,14,17,"S");
+
+  rect(g,13,13,7,18,"H");
+
+  rect(g,9,10,4,4,"S");
+  rect(g,9,10,21,21,"S");
+
+  rect(g,9,10,9,10,"H");
+  rect(g,9,10,16,17,"H");
+
+  rect(g,11,12,12,13,"H");
+
+  rect(g,14,14,6,19,"S");
+  rect(g,15,15,5,20,"S");
+  rect(g,16,16,4,21,"S");
+
+  rect(g,17,17,3,5,"S");
+  rect(g,17,17,9,16,"S");
+  rect(g,17,17,20,22,"S");
+
+  rect(g,18,18,3,5,"S");
+  rect(g,18,18,20,22,"S");
+
+  rect(g,18,18,8,17,"B");
+  rect(g,19,19,8,17,"B");
+  rect(g,20,20,8,10,"B");
+  rect(g,20,20,15,17,"B");
+  rect(g,21,21,8,9,"B");
+  rect(g,21,21,16,17,"B");
+
+  rect(g,22,23,7,9,"H");
+  rect(g,22,23,16,18,"H");
+
+  return g;
+}
+
+const base = makeBase();
+
+function makeSprites(){
+  const sprites = {};
+  sprites.neutral = pack(base);
+
+  let g;
+
+  g = clone(base);
+  rect(g,13,13,11,14,"S");
+  rect(g,12,12,11,11,"S");
+  rect(g,12,12,14,14,"S");
+  rect(g,10,10,9,10,"S");
+  rect(g,10,10,16,17,"S");
+  sprites.happy = pack(g);
+
+  g = clone(base);
+  rect(g,9,9,9,10,"S");
+  rect(g,10,10,9,10,"H");
+  rect(g,9,9,16,17,"S");
+  rect(g,10,10,16,17,"H");
+  rect(g,13,13,11,14,"S");
+  g[13][11]="H";
+  g[13][14]="H";
+  rect(g,12,12,12,13,"S");
+  sprites.sad = pack(g);
+
+  g = clone(base);
+  rect(g,8,8,8,10,"H");
+  rect(g,8,8,16,18,"H");
+  g[9][11]="H";
+  g[9][15]="H";
+  rect(g,10,10,9,10,"S");
+  rect(g,10,10,16,17,"S");
+  rect(g,13,13,11,14,"S");
+  sprites.angry = pack(g);
+
+  g = clone(base);
+  rect(g,13,14,12,13,"M");
+  sprites.surprised = pack(g);
+
+  g = clone(base);
+  rect(g,9,10,9,10,"S");
+  rect(g,9,10,16,17,"S");
+  rect(g,10,10,9,10,"H");
+  rect(g,10,10,16,17,"H");
+  sprites.blink = pack(g);
+
+  g = clone(base);
+  rect(g,13,13,12,13,"M");
+  sprites.talking1 = pack(g);
+
+  g = clone(base);
+  rect(g,13,14,12,13,"M");
+  sprites.talking2 = pack(g);
+
+  g = clone(base);
+  rect(g,13,14,11,14,"M");
+  rect(g,14,14,12,13,"R");
+  sprites.talking3 = pack(g);
+
+  return sprites;
+}
+
+const SPRITES = makeSprites();
+
+const canvas = document.querySelector("#stage");
+const ctx = canvas.getContext("2d", {alpha:false});
+const video = document.querySelector("#camera");
+
+const btnStart = document.querySelector("#btnStart");
+const btnRecord = document.querySelector("#btnRecord");
+const btnStop = document.querySelector("#btnStop");
+const download = document.querySelector("#download");
+
+const statusEl = document.querySelector("#status");
+const emotionEl = document.querySelector("#emotion");
+const formatEl = document.querySelector("#format");
+
+const scaleInput = document.querySelector("#scale");
+const smoothInput = document.querySelector("#smooth");
+const showGridInput = document.querySelector("#showGrid");
+const showCameraInput = document.querySelector("#showCamera");
+const blackBgInput = document.querySelector("#blackBg");
+
+let faceLandmarker = null;
+let cameraStream = null;
+let micStream = null;
+let audioCtx = null;
+let analyser = null;
+let audioData = null;
+
+let recorder = null;
+let chunks = [];
+let recordingMime = "";
+
+let lastVideoTime = -1;
+let currentEmotion = "neutral";
+let stableEmotion = "neutral";
+let stableSince = performance.now();
+
+let head = {x:0,y:0,roll:0};
+let smoothHead = {x:0,y:0,roll:0};
+let mouthFrame = 0;
+
+const MODEL_URL =
+"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
+
+function setStatus(text){
+  statusEl.textContent = text;
+}
+
+function getBlend(blendshapes,name){
+  const item = blendshapes?.categories?.find(c=>c.categoryName===name);
+  return item ? item.score : 0;
+}
+
+function chooseEmotion(result,volume){
+  const b = result?.faceBlendshapes?.[0];
+  if(!b) return volume > 0.08 ? "talking" : "neutral";
+
+  const smile = (getBlend(b,"mouthSmileLeft") + getBlend(b,"mouthSmileRight")) / 2;
+  const frown = (getBlend(b,"mouthFrownLeft") + getBlend(b,"mouthFrownRight")) / 2;
+  const jawOpen = getBlend(b,"jawOpen");
+  const browDown = (getBlend(b,"browDownLeft") + getBlend(b,"browDownRight")) / 2;
+  const browInnerUp = getBlend(b,"browInnerUp");
+  const blink = Math.max(getBlend(b,"eyeBlinkLeft"), getBlend(b,"eyeBlinkRight"));
+
+  if(blink > 0.62) return "blink";
+  if(jawOpen > 0.45 && browInnerUp > 0.20) return "surprised";
+  if(browDown > 0.32) return "angry";
+  if(frown > 0.22 || browInnerUp > 0.42) return "sad";
+  if(smile > 0.36) return "happy";
+  if(jawOpen > 0.18 || volume > 0.075) return "talking";
+
+  return "neutral";
+}
+
+function stabilizeEmotion(next){
+  const now = performance.now();
+
+  if(next !== currentEmotion){
+    currentEmotion = next;
+    stableSince = now;
+    return stableEmotion;
+  }
+
+  const delay = next === "blink" || next === "talking" ? 35 : 130;
+  if(now - stableSince > delay) stableEmotion = next;
+
+  return stableEmotion;
+}
+
+function getMicVolume(){
+  if(!analyser || !audioData) return 0;
+
+  analyser.getByteTimeDomainData(audioData);
+
+  let sum = 0;
+  for(const v of audioData){
+    const n = (v - 128) / 128;
+    sum += n * n;
+  }
+
+  return Math.sqrt(sum / audioData.length);
+}
+
+function updateHeadFromLandmarks(result){
+  const lm = result?.faceLandmarks?.[0];
+
+  if(!lm || !lm[1]){
+    head.x *= 0.92;
+    head.y *= 0.92;
+    head.roll *= 0.92;
+    return;
+  }
+
+  const nose = lm[1];
+  const leftEye = lm[33];
+  const rightEye = lm[263];
+
+  head.x = (0.5 - nose.x) * 170;
+  head.y = (nose.y - 0.5) * 120;
+
+  if(leftEye && rightEye){
+    const dx = rightEye.x - leftEye.x;
+    const dy = rightEye.y - leftEye.y;
+    head.roll = Math.atan2(dy,dx) * 0.18;
+  }
+}
+
+function pickTalkingSprite(volume){
+  mouthFrame = (mouthFrame + 1) % 30;
+
+  if(volume > 0.16) return "talking3";
+  if(volume > 0.09) return mouthFrame % 12 < 6 ? "talking2" : "talking1";
+
+  return mouthFrame % 18 < 9 ? "talking1" : "neutral";
+}
+
+function drawSprite(spriteName,x,y,cell,showGrid){
+  const sprite = SPRITES[spriteName] || SPRITES.neutral;
+  ctx.imageSmoothingEnabled = false;
+
+  for(let row=0; row<SPRITE_H; row++){
+    const line = sprite[row];
+
+    for(let col=0; col<SPRITE_W; col++){
+      const key = line[col] || ".";
+      const color = PALETTE[key];
+
+      if(!color) continue;
+
+      ctx.fillStyle = color;
+      ctx.fillRect(
+        Math.round(x + col * cell),
+        Math.round(y + row * cell),
+        cell,
+        cell
+      );
+    }
+  }
+
+  if(showGrid){
+    ctx.strokeStyle = "rgba(255,255,255,.22)";
+    ctx.lineWidth = 1;
+
+    for(let col=0; col<=SPRITE_W; col++){
+      const gx = Math.round(x + col * cell) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(gx,Math.round(y));
+      ctx.lineTo(gx,Math.round(y + SPRITE_H * cell));
+      ctx.stroke();
+    }
+
+    for(let row=0; row<=SPRITE_H; row++){
+      const gy = Math.round(y + row * cell) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x),gy);
+      ctx.lineTo(Math.round(x + SPRITE_W * cell),gy);
+      ctx.stroke();
+    }
+  }
+}
+
+function draw(){
+  const bg = blackBgInput.checked ? "#000" : "#1b1b1b";
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const cell = Number(scaleInput.value);
+  const smoothing = Number(smoothInput.value) / 100;
+
+  smoothHead.x = smoothHead.x * smoothing + head.x * (1 - smoothing);
+  smoothHead.y = smoothHead.y * smoothing + head.y * (1 - smoothing);
+  smoothHead.roll = smoothHead.roll * smoothing + head.roll * (1 - smoothing);
+
+  const volume = getMicVolume();
+
+  let spriteName = stableEmotion;
+  if(spriteName === "talking") spriteName = pickTalkingSprite(volume);
+
+  const w = SPRITE_W * cell;
+  const h = SPRITE_H * cell;
+
+  const cx = canvas.width / 2 + smoothHead.x;
+  const cy = canvas.height / 2 + smoothHead.y;
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(smoothHead.roll);
+  drawSprite(spriteName,-w/2,-h/2,cell,showGridInput.checked);
+  ctx.restore();
+
+  emotionEl.textContent = spriteName;
+}
+
+async function initFaceLandmarker(){
+  setStatus("загружаю MediaPipe");
+
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+  );
+
+  faceLandmarker = await FaceLandmarker.createFromOptions(vision,{
+    baseOptions:{
+      modelAssetPath: MODEL_URL,
+      delegate: "GPU"
+    },
+    outputFaceBlendshapes: true,
+    outputFacialTransformationMatrixes: true,
+    runningMode: "VIDEO",
+    numFaces: 1
+  });
+}
+
+async function initStreams(){
+  setStatus("запрашиваю камеру и микрофон");
+
+  cameraStream = await navigator.mediaDevices.getUserMedia({
+    video:{
+      width:{ideal:1280},
+      height:{ideal:720},
+      facingMode:"user"
+    },
+    audio:false
+  });
+
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio:{
+      echoCancellation:true,
+      noiseSuppression:true,
+      autoGainControl:true
+    },
+    video:false
+  });
+
+  video.srcObject = cameraStream;
+  await video.play();
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  const source = audioCtx.createMediaStreamSource(micStream);
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+
+  source.connect(analyser);
+
+  audioData = new Uint8Array(analyser.frequencyBinCount);
+}
+
+function loop(){
+  if(video.readyState >= 2 && video.currentTime !== lastVideoTime && faceLandmarker){
+    lastVideoTime = video.currentTime;
+
+    const result = faceLandmarker.detectForVideo(video,performance.now());
+    const volume = getMicVolume();
+
+    updateHeadFromLandmarks(result);
+
+    const nextEmotion = chooseEmotion(result,volume);
+    stabilizeEmotion(nextEmotion);
+  } else {
+    head.x *= 0.96;
+    head.y *= 0.96;
+    head.roll *= 0.96;
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function selectMimeType(){
+  const types = [
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4",
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm"
+  ];
+
+  return types.find(type => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+async function startRecording(){
+  chunks = [];
+
+  download.classList.add("hidden");
+  download.removeAttribute("href");
+
+  const canvasStream = canvas.captureStream(30);
+
+  const tracks = [
+    ...canvasStream.getVideoTracks(),
+    ...micStream.getAudioTracks()
+  ];
+
+  const mixed = new MediaStream(tracks);
+
+  recordingMime = selectMimeType();
+
+  const options = recordingMime ? {mimeType: recordingMime} : undefined;
+
+  recorder = new MediaRecorder(mixed,options);
+
+  recorder.ondataavailable = event => {
+    if(event.data && event.data.size > 0) chunks.push(event.data);
+  };
+
+  recorder.onstop = () => {
+    const type = recordingMime || "video/webm";
+    const blob = new Blob(chunks,{type});
+    const url = URL.createObjectURL(blob);
+    const isMp4 = type.includes("mp4");
+
+    download.href = url;
+    download.download =
+      `pixel-vtuber-${new Date().toISOString().replace(/[:.]/g,"-")}.${isMp4 ? "mp4" : "webm"}`;
+
+    download.classList.remove("hidden");
+
+    btnRecord.disabled = false;
+    btnStop.disabled = true;
+
+    setStatus("запись готова");
+  };
+
+  recorder.start(250);
+
+  formatEl.textContent = recordingMime || "browser default";
+
+  btnRecord.disabled = true;
+  btnStop.disabled = false;
+
+  setStatus("идёт запись");
+}
+
+btnStart.addEventListener("click",async()=>{
+  try{
+    btnStart.disabled = true;
+
+    await initFaceLandmarker();
+    await initStreams();
+
+    btnRecord.disabled = false;
+
+    setStatus("камера включена");
+
+    loop();
+  } catch(error){
+    console.error(error);
+    setStatus("ошибка: " + error.message);
+    btnStart.disabled = false;
+  }
+});
+
+btnRecord.addEventListener("click",startRecording);
+
+btnStop.addEventListener("click",()=>{
+  if(recorder && recorder.state !== "inactive") recorder.stop();
+});
+
+showCameraInput.addEventListener("change",()=>{
+  video.classList.toggle("visible",showCameraInput.checked);
+});
+
+draw();
+</script>
+</body>
+</html>
