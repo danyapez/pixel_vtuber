@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ru">
 <head>
@@ -136,7 +135,7 @@ const el={
  
 };
 
-let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null, recorderAudioDestination=null;
+let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null;
 let recorder=null, chunks=[], lastVideoTime=-1;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
@@ -261,7 +260,7 @@ async function initCamera(){
 
  stream=await navigator.mediaDevices.getUserMedia({
   video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
-  audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,sampleRate:{ideal:44100},channelCount:{ideal:2}}
+  audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:{ideal:44100},channelCount:{ideal:1}},channelCount:{ideal:2}}
  });
 
  video.srcObject=stream;
@@ -281,10 +280,9 @@ async function initCamera(){
   analyser=audioCtx.createAnalyser();
   analyser.fftSize=512;
 
-  recorderAudioDestination=audioCtx.createMediaStreamDestination();
-
+  // AudioContext нужен только для анимации рта.
+  // В запись идёт прямой микрофонный трек без шумодава и автоусиления.
   source.connect(analyser);
-  source.connect(recorderAudioDestination);
 
   audioData=new Uint8Array(analyser.frequencyBinCount);
  }
@@ -390,9 +388,7 @@ function startRec(){
 
  const settings=exportSettings();
  const videoStream=recCanvas.captureStream(30);
- const audioTracks = recorderAudioDestination
-  ? recorderAudioDestination.stream.getAudioTracks()
-  : (micStream ? micStream.getAudioTracks() : []);
+ const audioTracks=micStream ? micStream.getAudioTracks() : [];
 
  if(!audioTracks.length){
   warn("MICROPHONE TRACK NOT FOUND. VIDEO WILL BE RECORDED WITHOUT AUDIO.");
@@ -407,7 +403,7 @@ function startRec(){
  recorder=new MediaRecorder(mixedStream,{
   mimeType:mime,
   videoBitsPerSecond:settings.br,
-  audioBitsPerSecond:192000
+  audioBitsPerSecond:128000
  });
 
  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
@@ -417,7 +413,7 @@ function startRec(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
 
   el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_stable_video_audio441_${stamp}.mp4`;
+  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_cleanmic_${stamp}.mp4`;
   el.downloadZip.classList.remove("hidden");
   setTimeout(()=>el.downloadZip.click(),120);
 
