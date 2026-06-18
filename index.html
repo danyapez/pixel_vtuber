@@ -154,7 +154,7 @@ let ffmpegReady=false;
 let ffmpegLoading=false;
 let ffmpegProgressAttached=false;
 
-let wavSource=null, wavProcessor=null, wavSilentGain=null, wavBuffers=[], wavSampleRate=48000;
+let wavSource=null, wavProcessor=null, wavSilentGain=null, wavBuffers=[], wavSampleRate=44100;
 
 function setStatus(t){el.status.textContent=t}
 function warn(t){el.warn.textContent=t;el.warn.classList.add("visible")}
@@ -304,7 +304,7 @@ async function initCamera(){
 
  stream=await navigator.mediaDevices.getUserMedia({
   video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
-  audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,sampleRate:{ideal:48000},channelCount:{ideal:2}}
+  audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,sampleRate:{ideal:44100},channelCount:{ideal:2}}
  });
 
  video.srcObject=stream;
@@ -312,7 +312,11 @@ async function initCamera(){
 
  micStream=new MediaStream(stream.getAudioTracks());
 
- audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ try{
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
+ }catch(e){
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ }
  await audioCtx.resume();
 
  if(micStream.getAudioTracks().length){
@@ -469,7 +473,7 @@ async function loadFfmpegFast(background=false){
   ffmpeg.on("progress",({progress})=>{
    if(!progress && progress !== 0)return;
    const p=Math.max(1,Math.min(99,Math.round(progress*100)));
-   el.stop.textContent=`CONVERT ${p}%`;
+   el.stop.textContent=`AUDIO FIX ${p}%`;
   });
 
   ffmpeg.on("log",({message})=>{
@@ -515,10 +519,10 @@ async function fastCapCutFix(inputBlob){
 
   // Реальная быстрая конвертация для CapCut:
   // видео НЕ перекодируем, чтобы было быстро;
-  // звук перекодируем в AAC 48 kHz stereo — это чаще всего и нужно CapCut.
-  el.stop.textContent="CONVERT AUDIO";
-  setStatus("CONVERT AUDIO");
-  startFixVisual("CONVERT");
+  // звук перекодируем в AAC 44.1 kHz stereo — это чаще всего и нужно CapCut.
+  el.stop.textContent="AUDIO 44.1";
+  setStatus("AUDIO 44.1");
+  startFixVisual("AUDIO FIX");
 
   await ffmpeg.exec([
    "-i","input.mp4",
@@ -527,7 +531,7 @@ async function fastCapCutFix(inputBlob){
    "-c:v","copy",
    "-c:a","aac",
    "-b:a","160k",
-   "-ar","48000",
+   "-ar","44100",
    "-ac","2",
    "-movflags","+faststart",
    "output.mp4"
@@ -546,7 +550,7 @@ async function fastCapCutFix(inputBlob){
  }catch(e){
   stopFixVisual();
   console.error(e);
-  warn("FAST FIX FAILED. DOWNLOADING RAW MP4. "+String(e.message||e));
+  warn("AAC 44.1 FIX FAILED. DOWNLOADING RAW MP4. "+String(e.message||e));
   el.stop.textContent="RAW MP4";
   return inputBlob;
  }
@@ -594,8 +598,8 @@ function startRec(){
  recorder.onstop=async()=>{
   stopRecordTimer();
   el.stop.disabled=true;
-  el.stop.textContent="START FIX";
-  setStatus("START FIX");
+  el.stop.textContent="START AUDIO FIX";
+  setStatus("START AUDIO FIX");
 
   const rawBlob=new Blob(chunks,{type:mime});
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
@@ -603,7 +607,7 @@ function startRec(){
   const finalBlob=await fastCapCutFix(rawBlob);
 
   el.downloadZip.href=URL.createObjectURL(finalBlob);
-  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_fastfix_${stamp}.mp4`;
+  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_aac44100_${stamp}.mp4`;
   el.downloadZip.classList.remove("hidden");
 
   el.rec.disabled=false;
@@ -669,3 +673,4 @@ loadFfmpegFast(true).catch(e=>console.warn("FFMPEG preload on page load failed",
 </script>
 </body>
 </html>
+
