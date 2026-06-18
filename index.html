@@ -12,7 +12,7 @@
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:"Press Start 2P",monospace;font-size:11px}
-.app{min-height:100svh;display:grid;grid-template-columns:minmax(0,1fr) 390px;background:#000}
+.app{min-height:100svh;display:grid;grid-template-columns:minmax(0,1fr) 400px;background:#000}
 .stage{position:relative;display:grid;place-items:center;min-height:100svh;background:#000;overflow:hidden}
 #preview{width:min(100vw,calc(100svh * 16 / 9));max-width:100%;aspect-ratio:16/9;background:#000;image-rendering:pixelated;image-rendering:crisp-edges}
 #camera{position:absolute;right:18px;bottom:18px;width:220px;aspect-ratio:16/9;object-fit:cover;border:1px solid rgba(255,255,255,.25);transform:scaleX(-1);display:none;background:#000}
@@ -35,7 +35,6 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 .status span{color:#00ff00}
 .warn{display:none;border:1px solid #ffcc00;color:#ffcc00;padding:12px;font-size:8px;line-height:1.7}
 .warn.visible{display:block}
-
 @media(max-width:900px){
   .app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
   .stage{min-height:0;height:38svh}
@@ -49,74 +48,70 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 
 <body>
 <main class="app">
-  <section class="stage">
-    <canvas id="preview" width="1920" height="1080"></canvas>
-    <video id="camera" playsinline muted autoplay></video>
-  </section>
+<section class="stage">
+<canvas id="preview" width="1920" height="1080"></canvas>
+<video id="camera" playsinline muted autoplay></video>
+</section>
 
-  <aside class="panel">
-    <div>
-      <h1>danyapez_avatar</h1>
-      <p>preview black / export #00FF00 MP4</p>
-    </div>
+<aside class="panel">
+<div>
+<h1>danyapez_avatar</h1>
+<p>preview black / export MP4 green + WAV</p>
+</div>
 
-    <div id="warn" class="warn"></div>
+<div id="warn" class="warn"></div>
 
-    <div class="buttons">
-      <button id="start">START CAMERA</button>
-      <button id="rec">REC MP4</button>
-      <button id="stop" disabled>STOP</button>
-    </div>
+<div class="buttons">
+<button id="start">START CAMERA</button>
+<button id="rec">REC</button>
+<button id="stop" disabled>STOP</button>
+</div>
 
-    <a id="download" class="hidden" download>DOWNLOAD MP4</a>
+<button id="downloadAll" class="hidden">DOWNLOAD MP4 + WAV</button>
+<a id="downloadVideo" class="hidden" download>download mp4</a>
+<a id="downloadAudio" class="hidden" download>download wav</a>
 
-    <div class="manual">
-      <button data-s="static">STATIC</button>
-      <button data-s="open_mouth">MOUTH</button>
-      <button data-s="brows">BROWS</button>
-      <button data-s="surprised">WOW</button>
-    </div>
+<div class="manual">
+<button data-s="static">STATIC</button>
+<button data-s="open_mouth">MOUTH</button>
+<button data-s="brows">BROWS</button>
+<button data-s="surprised">WOW</button>
+</div>
 
-    <label>
-      EXPORT
-      <select id="size">
-        <option value="4k" selected>3840×2160 MP4 GREEN</option>
-        <option value="1080">1920×1080 MP4 GREEN</option>
-      </select>
-    </label>
+<label>EXPORT
+<select id="size">
+<option value="4k" selected>3840×2160 MP4 GREEN</option>
+<option value="1080">1920×1080 MP4 GREEN</option>
+</select>
+</label>
 
-    <label>
-      SIZE
-      <input id="scale" type="range" min="0.7" max="2.6" step="0.05" value="1.55">
-    </label>
+<label>SIZE
+<input id="scale" type="range" min="0.7" max="2.6" step="0.05" value="1.55">
+</label>
 
-    <label>
-      HEAD MOVE
-      <input id="move" type="range" min="0" max="220" step="1" value="90">
-    </label>
+<label>HEAD MOVE
+<input id="move" type="range" min="0" max="220" step="1" value="90">
+</label>
 
-    <label>
-      SMOOTH
-      <input id="smooth" type="range" min="0" max="96" step="1" value="78">
-    </label>
+<label>SMOOTH
+<input id="smooth" type="range" min="0" max="96" step="1" value="78">
+</label>
 
-    <label class="check">
-      <input id="showCam" type="checkbox">
-      <span>SHOW CAMERA</span>
-    </label>
+<label class="check">
+<input id="showCam" type="checkbox"><span>SHOW CAMERA</span>
+</label>
 
-    <div class="status">
-      <div>STATUS: <span id="status">WAIT</span></div>
-      <div>SPRITE: <span id="spriteName">STATIC</span></div>
-      <div>BG: <span>#00FF00</span></div>
-      <div>EXPORT: <span id="exportInfo">3840×2160</span></div>
-      <div>FORMAT: <span id="format">MP4</span></div>
-    </div>
+<div class="status">
+<div>STATUS: <span id="status">WAIT</span></div>
+<div>SPRITE: <span id="spriteName">STATIC</span></div>
+<div>VIDEO: <span>MP4 #00FF00</span></div>
+<div>AUDIO: <span>WAV SEPARATE</span></div>
+<div>EXPORT: <span id="exportInfo">3840×2160</span></div>
+<div>FORMAT: <span id="format">MP4 + WAV</span></div>
+</div>
 
-    <p>
-      Персонаж вшит прямо в HTML как 26×25 сетка. Отдельные PNG загружать не нужно.
-    </p>
-  </aside>
+<p>После STOP нажми DOWNLOAD MP4 + WAV. Браузер скачает два файла: видео без звука и отдельный WAV. Если браузер спросит разрешение на несколько скачиваний — разреши.</p>
+</aside>
 </main>
 
 <script type="module">
@@ -132,7 +127,9 @@ const PALETTE = {
   ".": null,
   "H": "#412C00",
   "S": "#FAD7A7",
-  "B": "#0302A7"
+  "B": "#0302A7",
+  "M": "#000000",
+  "R": "#A91919"
 };
 
 const SPRITE_W = 26;
@@ -154,8 +151,8 @@ const SPRITES = {
     "......SHSSSSSSSSSSHS......",
     "......SHSHHSHSSHHSHS......",
     ".......HSSSSHHSSSSH.......",
-    ".......HHHHHSSHHHHH.......",
-    "......SSHHHHHHHHHSS.......",
+    ".......HHHHHMMHHHHH.......",
+    "......SSHHHHMMHHHSS.......",
     ".....SSSSSSSSSSSSSSS......",
     ".....S..SSSSSSSSS..S......",
     "....SSS..SSSSSSS..SSS.....",
@@ -210,8 +207,8 @@ const SPRITES = {
     "......SHSSSSSSSSSSHS......",
     "......SHSHHSHSSHHSHS......",
     "...SSS.HSSSSHHSSSSH.SSS...",
-    "...SSS.HHHHHSSHHHHH.SSS...",
-    "....S.SSHHHHHHHHHHSS.S....",
+    "...SSS.HHHHHMMHHHHH.SSS...",
+    "....S.SSHHHHMMHHHHSS.S....",
     "....SSSSSSSSSSSSSSSSSS....",
     "........SSSSSSSSS.........",
     ".........SSSSSSS..........",
@@ -265,7 +262,9 @@ const el = {
   start: document.querySelector("#start"),
   rec: document.querySelector("#rec"),
   stop: document.querySelector("#stop"),
-  download: document.querySelector("#download"),
+  downloadAll: document.querySelector("#downloadAll"),
+  downloadVideo: document.querySelector("#downloadVideo"),
+  downloadAudio: document.querySelector("#downloadAudio"),
   warn: document.querySelector("#warn"),
   status: document.querySelector("#status"),
   spriteName: document.querySelector("#spriteName"),
@@ -296,6 +295,12 @@ let cameraReady = false;
 
 let head = { x: 0, y: 0 };
 let smoothHead = { x: 0, y: 0 };
+
+let wavSource = null;
+let wavProcessor = null;
+let wavSilentGain = null;
+let wavBuffers = [];
+let wavSampleRate = 48000;
 
 function setStatus(text) {
   el.status.textContent = text;
@@ -537,6 +542,101 @@ async function initCameraAndMic() {
   cameraReady = true;
 }
 
+function startWavRecord() {
+  wavBuffers = [];
+
+  if (!audioCtx || !micStream || !micStream.getAudioTracks().length) {
+    return;
+  }
+
+  wavSampleRate = audioCtx.sampleRate;
+
+  wavSource = audioCtx.createMediaStreamSource(micStream);
+  wavProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
+  wavSilentGain = audioCtx.createGain();
+
+  wavSilentGain.gain.value = 0;
+
+  wavProcessor.onaudioprocess = event => {
+    const input = event.inputBuffer.getChannelData(0);
+    wavBuffers.push(new Float32Array(input));
+    event.outputBuffer.getChannelData(0).fill(0);
+  };
+
+  wavSource.connect(wavProcessor);
+  wavProcessor.connect(wavSilentGain);
+  wavSilentGain.connect(audioCtx.destination);
+}
+
+function stopWavRecord() {
+  if (wavProcessor) {
+    wavProcessor.disconnect();
+    wavProcessor.onaudioprocess = null;
+    wavProcessor = null;
+  }
+
+  if (wavSource) {
+    wavSource.disconnect();
+    wavSource = null;
+  }
+
+  if (wavSilentGain) {
+    wavSilentGain.disconnect();
+    wavSilentGain = null;
+  }
+
+  return encodeWav(wavBuffers, wavSampleRate);
+}
+
+function encodeWav(buffers, sampleRate) {
+  let length = 0;
+
+  for (const buffer of buffers) {
+    length += buffer.length;
+  }
+
+  const samples = new Float32Array(length);
+
+  let offset = 0;
+
+  for (const buffer of buffers) {
+    samples.set(buffer, offset);
+    offset += buffer.length;
+  }
+
+  const wavBuffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(wavBuffer);
+
+  function writeString(byteOffset, string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(byteOffset + i, string.charCodeAt(i));
+    }
+  }
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+
+  let position = 44;
+
+  for (let i = 0; i < samples.length; i++, position += 2) {
+    const sample = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(position, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+  }
+
+  return new Blob([view], { type: "audio/wav" });
+}
+
 function loop() {
   if (
     cameraReady &&
@@ -570,10 +670,9 @@ function loop() {
 
 function selectMp4MimeType() {
   const types = [
-    "video/mp4;codecs=avc1.640034,mp4a.40.2",
-    "video/mp4;codecs=avc1.640033,mp4a.40.2",
-    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-    "video/mp4;codecs=h264,aac",
+    "video/mp4;codecs=avc1.640034",
+    "video/mp4;codecs=avc1.640033",
+    "video/mp4;codecs=avc1.42E01E",
     "video/mp4"
   ];
 
@@ -585,8 +684,9 @@ function startRecording() {
 
   chunks = [];
 
-  el.download.classList.add("hidden");
-  el.download.removeAttribute("href");
+  el.downloadAll.classList.add("hidden");
+  el.downloadVideo.classList.add("hidden");
+  el.downloadAudio.classList.add("hidden");
 
   const settings = getExportSettings();
   const mimeType = selectMp4MimeType();
@@ -599,18 +699,16 @@ function startRecording() {
 
   const canvasStream = recordCanvas.captureStream(settings.fps);
 
-  const audioTracks = micStream ? micStream.getAudioTracks() : [];
-
-  const mixedStream = new MediaStream([
-    ...canvasStream.getVideoTracks(),
-    ...audioTracks
+  const videoOnlyStream = new MediaStream([
+    ...canvasStream.getVideoTracks()
   ]);
 
-  recorder = new MediaRecorder(mixedStream, {
+  recorder = new MediaRecorder(videoOnlyStream, {
     mimeType,
-    videoBitsPerSecond: settings.bitrate,
-    audioBitsPerSecond: 192000
+    videoBitsPerSecond: settings.bitrate
   });
+
+  startWavRecord();
 
   recorder.ondataavailable = event => {
     if (event.data && event.data.size > 0) {
@@ -619,13 +717,18 @@ function startRecording() {
   };
 
   recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: mimeType });
-    const url = URL.createObjectURL(blob);
+    const videoBlob = new Blob(chunks, { type: mimeType });
+    const wavBlob = stopWavRecord();
 
-    el.download.href = url;
-    el.download.download = `danyapez_avatar_${settings.label.replace("×", "x")}_${new Date().toISOString().replace(/[:.]/g, "-")}.mp4`;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 
-    el.download.classList.remove("hidden");
+    el.downloadVideo.href = URL.createObjectURL(videoBlob);
+    el.downloadVideo.download = `danyapez_avatar_video_${settings.label.replace("×", "x")}_${stamp}.mp4`;
+
+    el.downloadAudio.href = URL.createObjectURL(wavBlob);
+    el.downloadAudio.download = `danyapez_avatar_audio_${stamp}.wav`;
+
+    el.downloadAll.classList.remove("hidden");
 
     el.rec.disabled = false;
     el.stop.disabled = true;
@@ -635,12 +738,12 @@ function startRecording() {
 
   recorder.start(250);
 
-  el.format.textContent = "MP4";
+  el.format.textContent = "MP4 + WAV";
 
   el.rec.disabled = true;
   el.stop.disabled = false;
 
-  setStatus("REC MP4");
+  setStatus("REC");
 }
 
 el.start.addEventListener("click", async () => {
@@ -681,6 +784,14 @@ el.stop.addEventListener("click", () => {
   if (recorder && recorder.state !== "inactive") {
     recorder.stop();
   }
+});
+
+el.downloadAll.addEventListener("click", () => {
+  el.downloadVideo.click();
+
+  setTimeout(() => {
+    el.downloadAudio.click();
+  }, 500);
 });
 
 el.showCam.addEventListener("change", () => {
