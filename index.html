@@ -3,100 +3,898 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Pixel VTuber Alpha Recorder</title>
+<title>danyapez_avatar</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
 <style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--bg:#000;--panel:#050505;--text:#fff;--muted:#8f8f8f;--line:rgba(255,255,255,.24);--warn:#ffcc00}
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:"Press Start 2P",monospace;font-size:11px;overscroll-behavior:none}
-.app{min-height:100svh;display:grid;grid-template-columns:minmax(0,1fr) 400px;background:#000}
-.stage{position:relative;display:grid;place-items:center;min-height:100svh;background:#000;overflow:hidden}
-#stage{width:min(100vw,calc(100svh * 16 / 9));max-width:100%;aspect-ratio:16/9;background:#000;image-rendering:pixelated;image-rendering:crisp-edges}
-#camera{position:absolute;right:18px;bottom:18px;width:220px;aspect-ratio:16/9;object-fit:cover;border:1px solid var(--line);transform:scaleX(-1);display:none;background:#000}
-#camera.visible{display:block}
-.panel{padding:22px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
-h1{margin:0 0 6px;font-size:15px;line-height:1.45;letter-spacing:.5px}.subtitle{margin:0;color:var(--muted);font-size:9px;line-height:1.7}
-.warning{display:none;border:1px solid var(--warn);color:var(--warn);padding:12px;font-size:8px;line-height:1.7}.warning.visible{display:block}
-.buttons{display:grid;gap:9px}.manual{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-button,.download,select{width:100%;border:1px solid #fff;border-radius:0;padding:13px 12px;background:transparent;color:#fff;font-family:"Press Start 2P",monospace;font-size:8px;line-height:1.45;cursor:pointer;text-align:center;text-decoration:none;transition:background .15s linear,color .15s linear,opacity .15s linear;touch-action:manipulation}
-select{text-align:left;appearance:none;-webkit-appearance:none}
-button:hover:not(:disabled),button:active:not(:disabled),.download:hover,.download:active,select:hover{background:#fff;color:#000}
-button:disabled{opacity:.35;cursor:not-allowed}.download{display:block}.hidden{display:none!important}
-.control{display:grid;gap:9px;color:#fff;font-size:9px;line-height:1.6} input[type="range"]{width:100%;accent-color:#fff}
-.check{display:grid;grid-template-columns:18px 1fr;align-items:start;gap:8px;color:#fff;font-size:9px;line-height:1.6} input[type="checkbox"]{margin:0;width:13px;height:13px;accent-color:#fff}
-.status{border:1px solid var(--line);padding:14px;font-size:8px;line-height:2;color:#fff}.status span{color:#fff}
-.note{margin:auto 0 0;color:var(--muted);font-size:8px;line-height:1.8}
-.progress{width:100%;height:6px;border:1px solid var(--line);background:transparent;overflow:hidden}.progressFill{width:0%;height:100%;background:#fff}
-@media (max-width:900px){.app{min-height:100svh;grid-template-columns:1fr;grid-template-rows:auto 1fr}.stage{min-height:0;height:38svh}#stage{width:100vw;height:auto}.panel{border-left:0;border-top:1px solid var(--line);min-height:62svh;padding:14px;padding-bottom:max(14px,env(safe-area-inset-bottom));gap:12px}#camera{width:130px;right:10px;bottom:10px}h1{font-size:12px}.subtitle{font-size:8px}button,.download,select{padding:12px 9px;font-size:7px}}
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg: #000;
+  --panel: #050505;
+  --text: #fff;
+  --muted: #8f8f8f;
+  --line: rgba(255,255,255,.24);
+  --green: #00FF00;
+  --warn: #ffcc00;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Press Start 2P", monospace;
+  font-size: 11px;
+  overscroll-behavior: none;
+}
+
+.app {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  background: #000;
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100svh;
+  background: #000;
+  overflow: hidden;
+}
+
+#preview {
+  width: min(100vw, calc(100svh * 16 / 9));
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#camera {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 220px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  transform: scaleX(-1);
+  display: none;
+  background: #000;
+}
+
+#camera.visible {
+  display: block;
+}
+
+.panel {
+  padding: 22px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: .5px;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.warning {
+  display: none;
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  padding: 12px;
+  font-size: 8px;
+  line-height: 1.7;
+}
+
+.warning.visible {
+  display: block;
+}
+
+.buttons {
+  display: grid;
+  gap: 9px;
+}
+
+.manual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button,
+.download,
+select {
+  width: 100%;
+  border: 1px solid #fff;
+  border-radius: 0;
+  padding: 13px 12px;
+  background: transparent;
+  color: #fff;
+  font-family: "Press Start 2P", monospace;
+  font-size: 8px;
+  line-height: 1.45;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background .15s linear, color .15s linear, opacity .15s linear;
+  touch-action: manipulation;
+}
+
+select {
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+button:hover:not(:disabled),
+button:active:not(:disabled),
+.download:hover,
+.download:active,
+select:hover {
+  background: #fff;
+  color: #000;
+}
+
+button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.download {
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.control {
+  display: grid;
+  gap: 9px;
+  color: #fff;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #fff;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  align-items: start;
+  gap: 8px;
+  color: #fff;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+input[type="checkbox"] {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  accent-color: #fff;
+}
+
+.status {
+  border: 1px solid var(--line);
+  padding: 14px;
+  font-size: 8px;
+  line-height: 2;
+  color: #fff;
+}
+
+.status span {
+  color: var(--green);
+}
+
+.note {
+  margin: auto 0 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.8;
+}
+
+@media (max-width: 900px) {
+  .app {
+    min-height: 100svh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .stage {
+    min-height: 0;
+    height: 38svh;
+  }
+
+  .panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    min-height: 62svh;
+    padding: 14px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    gap: 12px;
+  }
+
+  #camera {
+    width: 130px;
+    right: 10px;
+    bottom: 10px;
+  }
+
+  h1 {
+    font-size: 12px;
+  }
+
+  .subtitle {
+    font-size: 8px;
+  }
+
+  button,
+  .download,
+  select {
+    padding: 12px 9px;
+    font-size: 7px;
+  }
+}
 </style>
 </head>
+
 <body>
-<main class="app"><section class="stage"><canvas id="stage" width="1920" height="1080"></canvas><video id="camera" playsinline muted autoplay></video></section>
-<aside class="panel">
-<div><h1>PIXEL ALPHA REC</h1><p class="subtitle">preview black / export transparent PNG sequence</p></div>
-<div id="warning" class="warning">CAMERA BLOCKED. OPEN IN SAFARI / CHROME, NOT TELEGRAM IN-APP BROWSER.</div>
-<div class="buttons"><button id="btnStart" type="button">START CAMERA</button><button id="btnRecord" type="button">REC ALPHA</button><button id="btnStop" type="button" disabled>STOP</button></div>
-<a id="download" class="download hidden" download>DOWNLOAD ZIP</a>
-<div class="manual"><button data-manual="static" type="button">STATIC</button><button data-manual="open_mouth" type="button">MOUTH</button><button data-manual="brows" type="button">BROWS</button><button data-manual="surprised" type="button">WOW</button></div>
-<label class="control">EXPORT MODE<select id="mode"><option value="png" selected>PNG SEQUENCE + ALPHA ZIP</option><option value="green">WEBM GREEN FALLBACK</option></select></label>
-<label class="control">EXPORT SIZE<select id="quality"><option value="4k" selected>3840×2160</option><option value="1080">1920×1080</option></select></label>
-<label class="control">PNG FPS<select id="pngFps"><option value="12">12 FPS LIGHT</option><option value="15" selected>15 FPS SAFE</option><option value="24">24 FPS HEAVY</option><option value="30">30 FPS VERY HEAVY</option></select></label>
-<label class="control">SIZE<input id="scale" type="range" min="0.7" max="2.6" step="0.05" value="1.55"></label>
-<label class="control">HEAD MOVE<input id="move" type="range" min="0" max="220" step="1" value="90"></label>
-<label class="control">SMOOTH<input id="smooth" type="range" min="0" max="96" step="1" value="78"></label>
-<label class="check"><input id="showCamera" type="checkbox"><span>SHOW CAMERA</span></label>
-<div class="progress"><div id="progressFill" class="progressFill"></div></div>
-<div class="status"><div>STATUS: <span id="status">WAIT</span></div><div>SPRITE: <span id="emotion">STATIC</span></div><div>ALPHA: <span>PNG TRANSPARENT</span></div><div>EXPORT: <span id="exportSize">3840×2160</span></div><div>FRAMES: <span id="frameCount">0</span></div><div>FORMAT: <span id="format">ZIP PNG</span></div></div>
-<p class="note">Best quality: PNG sequence with real alpha. Audio is saved separately as audio.webm inside the zip. Import the first PNG as an image sequence in Premiere / After Effects / Resolve.</p>
-</aside></main>
+<main class="app">
+  <section class="stage">
+    <canvas id="preview" width="1920" height="1080"></canvas>
+    <video id="camera" playsinline muted autoplay></video>
+  </section>
+
+  <aside class="panel">
+    <div>
+      <h1>danyapez_avatar</h1>
+      <p class="subtitle">preview black / export #00FF00 MP4</p>
+    </div>
+
+    <div id="warning" class="warning">
+      CAMERA BLOCKED. OPEN IN SAFARI / CHROME, NOT TELEGRAM IN-APP BROWSER.
+    </div>
+
+    <div class="buttons">
+      <button id="btnStart" type="button">START CAMERA</button>
+      <button id="btnRecord" type="button">REC MP4</button>
+      <button id="btnStop" type="button" disabled>STOP</button>
+    </div>
+
+    <a id="download" class="download hidden" download>DOWNLOAD MP4</a>
+
+    <div class="manual">
+      <button data-manual="static" type="button">STATIC</button>
+      <button data-manual="open_mouth" type="button">MOUTH</button>
+      <button data-manual="brows" type="button">BROWS</button>
+      <button data-manual="surprised" type="button">WOW</button>
+    </div>
+
+    <label class="control">
+      EXPORT
+      <select id="quality">
+        <option value="4k" selected>3840×2160 MP4 GREEN</option>
+        <option value="1080">1920×1080 MP4 GREEN</option>
+      </select>
+    </label>
+
+    <label class="control">
+      SIZE
+      <input id="scale" type="range" min="0.7" max="2.6" step="0.05" value="1.55">
+    </label>
+
+    <label class="control">
+      HEAD MOVE
+      <input id="move" type="range" min="0" max="220" step="1" value="90">
+    </label>
+
+    <label class="control">
+      SMOOTH
+      <input id="smooth" type="range" min="0" max="96" step="1" value="78">
+    </label>
+
+    <label class="check">
+      <input id="showCamera" type="checkbox">
+      <span>SHOW CAMERA</span>
+    </label>
+
+    <div class="status">
+      <div>STATUS: <span id="status">WAIT</span></div>
+      <div>SPRITE: <span id="emotion">STATIC</span></div>
+      <div>EXPORT BG: <span>#00FF00</span></div>
+      <div>EXPORT: <span id="exportSize">3840×2160</span></div>
+      <div>FORMAT: <span id="format">MP4</span></div>
+    </div>
+
+    <p class="note">
+      Запись строго MP4 на зелёном фоне #00FF00. Если браузер не поддерживает MP4-запись, открой в Chrome / Edge / Safari на компьютере. Preview is black; export is green.
+    </p>
+  </aside>
+</main>
+
 <script type="module">
-import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
-import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
-const SPRITE_URLS = {"open_mouth": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaAAAAGQCAYAAADoTLT0AAAQx0lEQVR4Ae3dsW0dVxAF0E+ZEOBSBLEJRq7AAStkoAoUsQkC6kWA/e1YivRGwOydOc5s6O2bOfdbFxvt7eYfAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIEJgg8DBhCTvsFXh+ut33bp+/+dv7zd9B+TEeb/Dh+KSDBAgQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCCqiA5ygBAgQInAsooHM7JwkQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCCqiA5ygBAgQInAsooHM7JwkQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCCqiA5ygBAgQInAsooHM7JwkQIECgIKCACniOEiBAgMC5gAI6t3OSAAECBAoCvsVRwHP0dvM9Hr+CTgHfE+rUr9/tDahu6AkECBAgcCCggA7QHCFAgACBuoACqht6AgECBAgcCCigAzRHCBAgQKAuoIDqhp5AgAABAgcCCugAzRECBAgQqAsooLqhJxAgQIDAgYACOkBzhAABAgTqAgqobugJBAgQIHAgoIAO0BwhQIAAgbqAAqobegIBAgQIHAgooAM0RwgQIECgLqCA6oaeQIAAAQIHAgroAM0RAgQIEKgLKKC6oScQIECAwIHA48EZRwYJ+J7PoDCtQiBMwBtQWGDGJUCAwBQBBTQlSXsQIEAgTEABhQVmXAIECEwRUEBTkrQHAQIEwgQUUFhgxiVA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", "brows": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaAAAAGQCAYAAADoTLT0AAARHElEQVR4Ae3dMY5kZdIF0CwotcRSWvQm2mIFGLXCMlgBVm+iJfaCNFMzEgI7M+KhyPvF+Z35jYz3Is6t5iqtvN38HwECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAicIPBywhFu2Cvw9cvtY+/1+Zd/+37z36D8GMsX/FCeNEiAAAECBBoCCqiBZ5QAAQIE6gIKqG5nkgABAgQaAgqogWeUAAECBOoCCqhuZ5IAAQIEGgIKqIFnlAABAgTqAgqobmeSAAECBBoCCqiBZ5QAAQIE6gIKqG5nkgABAgQaAgqogWeUAAECBOoCCqhuZ5IAAQIEGgIKqIFnlAABAgTqAgqobmeSAAECBBoCCqiBZ5QAAQIE6gIKqG5nkgABAgQaAn6Lo4Fn9Hbzezz+CiYF/J7QpH7/3b4B9Q09gQABAgQKAgqogGaEAAECBPoCCqhv6AkECBAgUBBQQAU0IwQIECDQF1BAfUNPIECAAIGCgAIqoBkhQIAAgb6AAuobegIBAgQIFAQUUAHNCAECBAj0BRRQ39ATCBAgQKAgoIAKaEYIECBAoC+ggPqGnkCAAAECBQEFVEAzQoAAAQJ9AQXUN/QEAgQIECgIKKACmhECBAgQ6AsooL6hJxAgQIBAQeC1MGPkIAG/53NQmE4hECbgG1BYYNYlQIDAKQIK6JQk3UGAAIEwAQUUFph1CRAgcIqAAjolSXcQIEAgTEABhQVmXQIE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", "surprised": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaAAAAGQCAYAAADoTLT0AAARHUlEQVR4Ae3dMY4d1xEF0D/ygICXQpibYOQVOJgVTqAVKOImCHAvBOyxDDhT0nrVUP1bdRQK/fpVnUvq4ivpx8M/BAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIDBB4GXCEnbYK/D1y+Nj7/b5m3/7/vDfoPwYjzf45fikgwQIECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAgqogOcoAQIECJwLKKBzOycJECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAgqogOcoAQIECJwLKKBzOycJECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAgqogOcoAQIECJwLKKBzOycJECBAoCCggAp4jhIgQIDAuYACOrdzkgABAgQKAr7FUcBz9PHwPR5/CjoFfE+oU79+t19AdUNvIECAAIEDAQV0gOYIAQIECNQFFFDd0BsIECBA4EBAAR2gOUKAAAECdQEFVDf0BgIECBA4EFBAB2iOECBAgEBdQAHVDb2BAAECBA4EFNABmiMECBAgUBdQQHVDbyBAgACBAwEFdIDmCAECBAjUBRRQ3dAbCBAgQOBAQAEdoDlCgAABAnUBBVQ39AYCBAgQOBBQQAdojhAgQIBAXUAB1Q29gQABAgQOBF4PzjgySMD3fAaFaRUCYQJ+AYUFZlwCBAhMEVBAU5K0BwECBMIEFFBYYMYlQIDAFAEFNCVJexAgQCBMQAGFBWZcAgQITBFQQFOStAcBAgTCBBRQWGDGJUCAwBQBBTQlSXsQIEAgTEABhQVmXAIECEwRUEBTkrQHAQIEwgQUUFhgxiVAgMAUAQU0JUl7ECBAIExAAYUFZlwCBAhMEVBAU5K0BwECBMIEFFBYYMYlQIDAFAEFNCVJexAgQCBMQAGFBWZcAgQITBFQQFOStAcBAgTCBBRQWGDGJUCAwBQBBTQlSXsQIEAgTEABhQVmXAIECEwRUEBTkrQHAQIEwgQUUFhgxiVAgMAUAQU0JUl7ECBAIExAAYUFZlwCBAhMEVBAU5K0BwECBMIEFFBYYMYlQIDAFAEFNCVJexAgQCBMQAGFBWZcAgQITBFQQFOStAcBAgTCBBRQWGDGJUCAwBSB1ymLbN3j65fHx9bd7U2AQLaAX0DZ+ZmeAAECsQIKKDY6gxMgQCBbQAFl52d6AgQIxAoooNjoDE6AAIFsAQWUnZ/pCRAgECuggGKjMzgBAgSyBRRQdn6mJ0CAQKyAAoqNzuAECBDIFlBA2fmZngABArECCig2OoMTIEAgW0ABZednegIECMQKKKDY6AxOgACBbAEFlJ2f6QkQIBAroIBiozM4AQIEsgUUUHZ+pidAgECsgAKKjc7gBAgQyBZQQNn5mZ4AAQKxAgooNjqDEyBAIFtAAWXnZ3oCBAjECiig2OgMToAAgWwBBZSdn+kJECAQK6CAYqMzOAECBLIFFFB2fqYnQIBArIACio3O4AQIEMgWUEDZ+ZmeAAECsQIKKDY6gxMgQCBbQAFl52d6AgQIxAoooNjoDE6AAIFsAQWUnZ/pCRAgECuggGKjMzgBAgSyBRRQdn6mJ0CAQKzAa+zkBr9F4Ldf3295j5cQOBH457/eTo45M0TAL6AhQVqDAAECaQIKKC0x8xIgQGCIgAIaEqQ1CBAgkCaggNISMy8BAgSGCCigIUFagwABAmkCCigtMfMSIEBgiIACGhKkNQgQIJAmoIDSEjMvAQIEhggooCFBWoMAAQJpAgooLTHzEiBAYIiAAhoSpDUIECCQJqCA0hIzLwECBIYIKKAhQVqDAAECaQIKKC0x8xIgQGCIgAIaEqQ1CBAgkCbge0DNif388f5RGcH3VCp6zqYLVP/+fPr89pJukDy/X0DJ6ZmdAAECwQIKKDg8oxMgQCBZQAElp2d2AgQIBAsooODwjE6AAIFkAQWUnJ7ZCRAgECyggILDMzoBAgSSBRRQcnpmJ0CAQLCAAgoOz+gECBBIFlBAyemZnQABAsECCig4PKMTIEAgWUABJadndgIECAQLKKDg8IxOgACBZAEFlJye2QkQIBAsoICCwzM6AQIEkgUUUHJ6ZidAgECwgO8BBYf3DKN3f4/ot1/fSwzV+av3l4b//XB1/ur93ftX53e+V8AvoF5/txMgQGCtgAJaG73FCRAg0CuggHr93U6AAIG1AgpobfQWJ0CAQK+AAur1dzsBAgTWCiigtdFbnAABAr0CCqjX3+0ECBBYK6CA1kZvcQIECPQKKKBef7cTIEBgrYACWhu9xQkQINAroIB6/d1OgACBtQIKaG30FidAgECvgALq9Xc7AQIE1goooLXRW5wAAQK9Agqo19/tBAgQWCvwkr75zx/vH8k7fPr8Vsrg65dHaf/t33PxPZ3evz1V/2/fH6W/P9v/+9Gb/uPhF1B3Au4nQIDAUgEFtDR4axMgQKBbQAF1J+B+AgQILBVQQEuDtzYBAgS6BRRQdwLuJ0CAwFIBBbQ0eGsTIECgW0ABdSfgfgIECCwVUEBLg7c2AQIEugUUUHcC7idAgMBSAQW0NHhrEyBAoFtAAXUn4H4CBAgsFVBAS4O3NgECBLoFFFB3Au4nQIDAUgEFtDR4axMgQKBbQAF1J+B+AgQILBV4Xbq3tf8vUP0eSzpk9/eQtvun//kxf03AL6Can9MECBAgcCiggA7hHCNAgACBmoACqvk5TYAAAQKHAgroEM4xAgQIEKgJKKCan9MECBAgcCiggA7hHCNAgACBmoACqvk5TYAAAQKHAgroEM4xAgQIEKgJKKCan9MECBAgcCiggA7hHCNAgACBmoACqvk5TYAAAQKHAgroEM4xAgQIEKgJKKCan9MECBAgcCiggA7hHCNAgACBmoACqvk5TYAAAQKHAi+H58Yc+/nj/aOyzKfPbyXD6v2V2f931vdoqoLOVwS6v8fU/fe3en/F/hnO+gX0DCmYgQABAgsFFNDC0K1MgACBZxBQQM+QghkIECCwUEABLQzdygQIEHgGAQX0DCmYgQABAgsFFNDC0K1MgACBZxBQQM+QghkIECCwUEABLQzdygQIEHgGAQX0DCmYgQABAgsFFNDC0K1MgACBZxBQQM+QghkIECCwUEABLQzdygQIEHgGAQX0DCmYgQABAgsFFNDC0K1MgACBZxBQQM+QghkIECCwUKD0LZsJXt3f45lgaAcCBM4EfA/ozM0pAgQIECBQEvC/4Ep8DhMgQIDAqYACOpVzjgABAgRKAgqoxOcwAQIECJwKKKBTOecIECBAoCSggEp8DhMgQIDAqYACOpVzjgABAgRKAgqoxOcwAQIECJwKKKBTOecIECBAoCSggEp8DhMgQIDAqYACOpVzjgABAgRKAgqoxOcwAQIECJwKKKBTOecIECBAoCSggEp8DhMgQIDAqYACOpVzjgABAgRKAuu/B1TSG3DY95AGhNi4wvbv2TTSj7jaL6ARMVqCAAECeQIKKC8zExMgQGCEgAIaEaMlCBAgkCeggPIyMzEBAgRGCCigETFaggABAnkCCigvMxMTIEBghIACGhGjJQgQIJAnoIDyMjMxAQIERggooBExWoIAAQJ5AgooLzMTEyBAYISAAhoRoyUIECCQJ6CA8jIzMQECBEYIKKARMVqCAAECeQIKKC8zExMgQGCEgAIaEaMlCBAgkCfge0B5mT3VxL4n9FRx/OlhfM/nT5M5cKOAX0A3YnoVAQIECFwXUEDXrTxJgAABAjcKKKAbMb2KAAECBK4LKKDrVp4kQIAAgRsFFNCNmF5FgAABAtcFFNB1K08SIECAwI0CCuhGTK8iQIAAgesCCui6lScJECBA4EYBBXQjplcRIECAwHUBBXTdypMECBAgcKOAAroR06sIECBA4LqAArpu5UkCBAgQuFFAAd2I6VUECBAgcF1AAV238iQBAgQI3CiggG7E9CoCBAgQuC7wev1RTxL4o8Df//HHf+ffECBA4IqAX0BXlDxDgAABArcLKKDbSb2QAAECBK4IKKArSp4hQIAAgdsFFNDtpF5IgAABAlcEFNAVJc8QIECAwO0CCuh2Ui8kQIAAgSsCCuiKkmcIECBA4HYBBXQ7qRcSIECAwBUBBXRFyTMECBAgcLuAArqd1AsJECBA4IqAArqi5BkCBAgQuF1AAd1O6oUECBAgcEVAAV1R8gwBAgQI3C6ggG4n9UICBAgQuCKggK4oeYYAAQIEbhfwPaDbSb3wrxT493/eXv7K++6+62+/vH/c/U7vI5Ai4BdQSlLmJECAwDABBTQsUOsQIEAgRUABpSRlTgIECAwTUEDDArUOAQIEUgQUUEpS5iRAgMAwAQU0LFDrECBAIEVAAaUkZU4CBAgME1BAwwK1DgECBFIEFFBKUuYkQIDAMAEFNCxQ6xAgQCBFQAGlJGVOAgQIDBNQQMMCtQ4BAgRSBBRQSlLmJECAwDABBTQsUOsQIEAgRUABpSRlTgIECAwT8D2gYYGmrZP+PZ+qd3V/3xOqJuB8p4BfQJ367iZAgMBiAQW0OHyrEyBAoFNAAXXqu5sAAQKLBRTQ4vCtToAAgU4BBdSp724CBAgsFlBAi8O3OgECBDoFFFCnvrsJECCwWEABLQ7f6gQIEOgUUECd+u4mQIDAYgEFtDh8qxMgQKBTQAF16rubAAECiwUU0OLwrU6AAIFOAQXUqe9uAgQILBZQQIvDtzoBAgQ6BRRQp767CRAgsFjgZfHuVv9d4OuXx0cnxLfvD38GCwHIr4DnaLuAX0DtERiAAAECOwUU0M7cbU2AAIF2AQXUHoEBCBAgsFNAAe3M3dYECBBoF1BA7REYgAABAjsFFNDO3G1NgACBdgEF1B6BAQgQILBTQAHtzN3WBAgQaBdQQO0RGIAAAQI7BRTQztxtTYAAgXYBBdQegQEIECCwU0AB7czd1gQIEGgXUEDtERiAAAECOwUU0M7cbU2AAIF2AQXUHoEBCBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECOQK/Beo5GAtRCspggAAAABJRU5ErkJggg==", "static": "data:image/png;base64,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fgIECAwVUEBDg7c2AQIEugUUUHcC7idAgMBQAQU0NHhrEyBAoFtAAXUn4H4CBAgMFVBAQ4O3NgECBLoFFFB3Au4nQIDAUIHXoXtb+yYC6d/zqTJW9+/+nlB1f+dnC/gFNDt/2xMgQKBNQAG10buYAAECswUU0Oz8bU+AAIE2AQXURu9iAgQIzBZQQLPztz0BAgTaBBRQG72LCRAgMFtAAc3O3/YECBBoE1BAbfQuJkCAwGwBBTQ7f9sTIECgTUABtdG7mAABArMFFNDs/G1PgACBNgEF1EbvYgIECMwWUECz87c9AQIE2gQUUBu9iwkQIDBbQAHNzt/2BAgQaBN4abvZxbcQ+Pjh8d45yLfvD3+DhQDkV8BztF3AL6D2CAxAgACBmQIKaGbutiZAgEC7gAJqj8AABAgQmCmggGbmbmsCBAi0Cyig9ggMQIAAgZkCCmhm7rYmQIBAu4ACao/AAAQIEJgpoIBm5m5rAgQItAsooPYIDECAAIGZAgpoZu62JkCAQLuAAmqPwAAECBCYKaCAZuZuawIECLQLKKD2CAxAgACBmQIKaGbutiZAgEC7gAJqj8AABAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBAgQIECAAAECBHIF/gHKyl83ZLApSAAAAABJRU5ErkJggg=="};
-const EXPORT_GREEN = "#00FF00";
+import {
+  FaceLandmarker,
+  FilesetResolver
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+const SPRITE_URLS = {
+  open_mouth: "IMG_8077.PNG",
+  brows: "IMG_8076.PNG",
+  surprised: "IMG_8075.PNG",
+  static: "IMG_8074.PNG"
+};
+
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
-const canvas=document.querySelector('#stage'), ctx=canvas.getContext('2d',{alpha:false});
-const alphaCanvas=document.createElement('canvas'), alphaCtx=alphaCanvas.getContext('2d',{alpha:true});
-const greenCanvas=document.createElement('canvas'), greenCtx=greenCanvas.getContext('2d',{alpha:false});
-const video=document.querySelector('#camera');
-const btnStart=document.querySelector('#btnStart'), btnRecord=document.querySelector('#btnRecord'), btnStop=document.querySelector('#btnStop'), download=document.querySelector('#download'), warning=document.querySelector('#warning');
-const statusEl=document.querySelector('#status'), emotionEl=document.querySelector('#emotion'), formatEl=document.querySelector('#format'), exportSizeEl=document.querySelector('#exportSize'), frameCountEl=document.querySelector('#frameCount'), progressFill=document.querySelector('#progressFill');
-const scaleInput=document.querySelector('#scale'), moveInput=document.querySelector('#move'), smoothInput=document.querySelector('#smooth'), showCameraInput=document.querySelector('#showCamera'), qualitySelect=document.querySelector('#quality'), pngFpsSelect=document.querySelector('#pngFps'), modeSelect=document.querySelector('#mode');
-let sprites={}, faceLandmarker=null, userStream=null, micStream=null, audioCtx=null, analyser=null, audioData=null, webmRecorder=null, audioRecorder=null, chunks=[], audioChunks=[], pngRecording=false, pngFrameTimer=null, frameIndex=0, framePromises=[], lastVideoTime=-1, currentEmotion='static', stableEmotion='static', stableSince=performance.now(), cameraReady=false, head={x:0,y:0}, smoothHead={x:0,y:0};
-function getExportSettings(){ return qualitySelect.value==='4k' ? {width:3840,height:2160,fps:30,videoBitsPerSecond:80000000,label:'3840×2160'} : {width:1920,height:1080,fps:30,videoBitsPerSecond:35000000,label:'1920×1080'}; }
-function updateExportCanvasSize(){ const s=getExportSettings(); alphaCanvas.width=s.width; alphaCanvas.height=s.height; greenCanvas.width=s.width; greenCanvas.height=s.height; exportSizeEl.textContent=s.label; }
-function setStatus(t){statusEl.textContent=t;} function showWarning(t){warning.textContent=t; warning.classList.add('visible');}
-function loadImage(src){ return new Promise((res,rej)=>{const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src;}); }
-function isBlack(data, idx){ return data[idx]<12 && data[idx+1]<12 && data[idx+2]<12 && data[idx+3]>0; }
-function makeBlackBackgroundTransparent(img){ const c=document.createElement('canvas'); c.width=img.naturalWidth||img.width; c.height=img.naturalHeight||img.height; const cctx=c.getContext('2d',{willReadFrequently:true}); cctx.imageSmoothingEnabled=false; cctx.drawImage(img,0,0); const imageData=cctx.getImageData(0,0,c.width,c.height), data=imageData.data, w=c.width, h=c.height, visited=new Uint8Array(w*h), stack=[]; function push(x,y){ if(x<0||y<0||x>=w||y>=h) return; const p=y*w+x; if(visited[p]) return; const idx=p*4; if(!isBlack(data,idx)) return; visited[p]=1; stack.push(p);} for(let x=0;x<w;x++){push(x,0);push(x,h-1);} for(let y=0;y<h;y++){push(0,y);push(w-1,y);} while(stack.length){ const p=stack.pop(), x=p%w, y=Math.floor(p/w), idx=p*4; data[idx+3]=0; push(x+1,y);push(x-1,y);push(x,y+1);push(x,y-1);} cctx.putImageData(imageData,0,0); return c; }
-async function loadSprites(){ const loaded={}; for(const [name,url] of Object.entries(SPRITE_URLS)){ const img=await loadImage(url); loaded[name]=makeBlackBackgroundTransparent(img); } sprites=loaded; }
-function getBlend(blendshapes,name){ const item=blendshapes?.categories?.find(c=>c.categoryName===name); return item?item.score:0; }
-function getMicVolume(){ if(!analyser||!audioData) return 0; analyser.getByteTimeDomainData(audioData); let sum=0; for(const v of audioData){ const n=(v-128)/128; sum += n*n; } return Math.sqrt(sum/audioData.length); }
-function chooseSprite(result, volume){ const b=result?.faceBlendshapes?.[0]; if(!b) return volume>0.07?'open_mouth':stableEmotion; const jawOpen=getBlend(b,'jawOpen'), browInnerUp=getBlend(b,'browInnerUp'), smile=(getBlend(b,'mouthSmileLeft')+getBlend(b,'mouthSmileRight'))/2, eyeWide=(getBlend(b,'eyeWideLeft')+getBlend(b,'eyeWideRight'))/2; if(jawOpen>0.45 && (browInnerUp>0.18 || eyeWide>0.18)) return 'surprised'; if(browInnerUp>0.34 || eyeWide>0.30 || smile>0.35) return 'brows'; if(jawOpen>0.13 || volume>0.065) return 'open_mouth'; return 'static'; }
-function stabilizeEmotion(next){ const now=performance.now(); if(next!==currentEmotion){ currentEmotion=next; stableSince=now; return stableEmotion; } const delay=next==='open_mouth'?35:110; if(now-stableSince>delay) stableEmotion=next; return stableEmotion; }
-function updateHeadFromLandmarks(result){ const lm=result?.faceLandmarks?.[0]; if(!lm||!lm[1]){ head.x*=0.92; head.y*=0.92; return; } const nose=lm[1], power=Number(moveInput.value); head.x=(0.5-nose.x)*power*1.8; head.y=(nose.y-0.5)*power*1.15; }
-function render(targetCtx,w,h,bg,transparent=false){ targetCtx.imageSmoothingEnabled=false; if(transparent) targetCtx.clearRect(0,0,w,h); else { targetCtx.fillStyle=bg; targetCtx.fillRect(0,0,w,h); } const sprite=sprites[stableEmotion]||sprites.static; if(!sprite) return; const smoothing=Number(smoothInput.value)/100; smoothHead.x=smoothHead.x*smoothing + head.x*(1-smoothing); smoothHead.y=smoothHead.y*smoothing + head.y*(1-smoothing); const exportFactor=h/1080, scale=Number(scaleInput.value)*exportFactor, sw=Math.round(sprite.width*scale), sh=Math.round(sprite.height*scale), x=Math.round(w/2 - sw/2 + smoothHead.x*exportFactor), y=Math.round(h/2 - sh/2 + smoothHead.y*exportFactor); targetCtx.drawImage(sprite,x,y,sw,sh); }
-async function initFaceLandmarker(){ if(faceLandmarker) return; setStatus('LOAD MEDIAPIPE'); const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'); faceLandmarker=await FaceLandmarker.createFromOptions(vision,{ baseOptions:{modelAssetPath:MODEL_URL,delegate:'GPU'}, outputFaceBlendshapes:true, runningMode:'VIDEO', numFaces:1 }); }
-async function initCameraAndMic(){ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw new Error('CAMERA API IS NOT AVAILABLE'); if(!window.isSecureContext) throw new Error('OPEN THROUGH HTTPS OR LOCALHOST'); setStatus('ASK CAMERA'); userStream=await navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:1280}, height:{ideal:720}, facingMode:'user' }, audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } }); video.srcObject=userStream; await video.play(); const audioTracks=userStream.getAudioTracks(); micStream=new MediaStream(audioTracks); audioCtx=new (window.AudioContext||window.webkitAudioContext)(); await audioCtx.resume(); if(audioTracks.length){ const source=audioCtx.createMediaStreamSource(micStream); analyser=audioCtx.createAnalyser(); analyser.fftSize=512; source.connect(analyser); audioData=new Uint8Array(analyser.frequencyBinCount); } cameraReady=true; }
-function loop(){ if(cameraReady && video.readyState>=2 && video.currentTime!==lastVideoTime && faceLandmarker){ lastVideoTime=video.currentTime; const result=faceLandmarker.detectForVideo(video, performance.now()), volume=getMicVolume(); updateHeadFromLandmarks(result); const next=chooseSprite(result, volume); stabilizeEmotion(next);} else { head.x*=0.96; head.y*=0.96; } render(ctx, canvas.width, canvas.height, '#000000', false); render(alphaCtx, alphaCanvas.width, alphaCanvas.height, null, true); render(greenCtx, greenCanvas.width, greenCanvas.height, EXPORT_GREEN, false); emotionEl.textContent=stableEmotion.toUpperCase(); requestAnimationFrame(loop); }
-function selectMimeType(){ const types=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4']; return types.find(t=>MediaRecorder.isTypeSupported(t))||''; }
-function startAudioRecord(){ audioChunks=[]; if(!micStream || !micStream.getAudioTracks().length){ audioRecorder=null; return; } const audioMime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'; audioRecorder=new MediaRecorder(micStream,{mimeType:audioMime}); audioRecorder.ondataavailable=e=>{ if(e.data&&e.data.size>0) audioChunks.push(e.data); }; audioRecorder.start(250); }
-function blobFromCanvas(c){ return new Promise(resolve=>c.toBlob(blob=>resolve(blob), 'image/png')); }
-function padded(n){ return String(n).padStart(5,'0'); }
-function capturePngFrame(){ const idx=frameIndex++; frameCountEl.textContent=String(frameIndex); framePromises.push(blobFromCanvas(alphaCanvas).then(blob=>({idx,blob}))); }
-async function stopPngRecording(){ pngRecording=false; if(pngFrameTimer) clearInterval(pngFrameTimer); pngFrameTimer=null; if(audioRecorder && audioRecorder.state!=='inactive'){ await new Promise(resolve=>{ audioRecorder.onstop=resolve; audioRecorder.stop(); }); } setStatus('MAKE ZIP'); btnStop.disabled=true; const frames=await Promise.all(framePromises); frames.sort((a,b)=>a.idx-b.idx); const zip=new JSZip(), framesFolder=zip.folder('frames_alpha_png'); for(let i=0;i<frames.length;i++){ framesFolder.file(`frame_${padded(frames[i].idx)}.png`, frames[i].blob); progressFill.style.width=`${Math.round((i+1)/frames.length*90)}%`; } if(audioChunks.length){ zip.file('audio.webm', new Blob(audioChunks,{type:'audio/webm'})); } const s=getExportSettings(), fps=Number(pngFpsSelect.value); zip.file('README_IMPORT.txt', `Pixel VTuber alpha export\n\nFrames: frames_alpha_png/frame_00000.png ...\nResolution: ${s.label}\nFPS: ${fps}\nBackground: transparent alpha, no chromakey\nAudio: audio.webm if microphone was allowed\n\nImport:\n- After Effects: import first PNG with PNG Sequence\n- Premiere: import first PNG with Image Sequence\n- Resolve: import as image sequence and set FPS to ${fps}\n`); const zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:1}}, meta=>{ progressFill.style.width=`${90+Math.round(meta.percent*0.1)}%`; }); const url=URL.createObjectURL(zipBlob); download.href=url; download.download=`pixel-vtuber-alpha-${s.label.replace('×','x')}-${fps}fps-${new Date().toISOString().replace(/[:.]/g,'-')}.zip`; download.classList.remove('hidden'); btnRecord.disabled=false; btnStop.disabled=true; setStatus('READY'); progressFill.style.width='100%'; }
-function startPngRecording(){ updateExportCanvasSize(); frameIndex=0; framePromises=[]; progressFill.style.width='0%'; frameCountEl.textContent='0'; download.classList.add('hidden'); startAudioRecord(); const fps=Number(pngFpsSelect.value); capturePngFrame(); pngRecording=true; pngFrameTimer=setInterval(()=>{ if(pngRecording) capturePngFrame(); }, 1000/fps); formatEl.textContent='ZIP PNG ALPHA'; btnRecord.disabled=true; btnStop.disabled=false; setStatus('REC ALPHA'); }
-function startGreenWebmRecording(){ updateExportCanvasSize(); chunks=[]; download.classList.add('hidden'); const settings=getExportSettings(), stream=greenCanvas.captureStream(settings.fps), audioTracks=micStream?micStream.getAudioTracks():[], mixed=new MediaStream([...stream.getVideoTracks(), ...audioTracks]); const recordingMime=selectMimeType(), opts={videoBitsPerSecond:settings.videoBitsPerSecond,audioBitsPerSecond:192000}; if(recordingMime) opts.mimeType=recordingMime; webmRecorder=new MediaRecorder(mixed, opts); webmRecorder.ondataavailable=e=>{ if(e.data&&e.data.size>0) chunks.push(e.data); }; webmRecorder.onstop=()=>{ const type=recordingMime||'video/webm', blob=new Blob(chunks,{type}), url=URL.createObjectURL(blob), isMp4=type.includes('mp4'), s=getExportSettings(); download.href=url; download.download=`pixel-vtuber-green-${s.label.replace('×','x')}-${new Date().toISOString().replace(/[:.]/g,'-')}.${isMp4?'mp4':'webm'}`; download.classList.remove('hidden'); btnRecord.disabled=false; btnStop.disabled=true; setStatus('READY'); }; webmRecorder.start(250); formatEl.textContent=(recordingMime||'WEBM').toUpperCase().replace('VIDEO/',''); btnRecord.disabled=true; btnStop.disabled=false; setStatus('REC GREEN'); }
-function startRecording(){ if(modeSelect.value==='png') startPngRecording(); else startGreenWebmRecording(); }
-async function stopRecording(){ if(modeSelect.value==='png' && pngRecording){ await stopPngRecording(); return; } if(webmRecorder && webmRecorder.state!=='inactive') webmRecorder.stop(); }
-btnStart.addEventListener('click', async ()=>{ try{ btnStart.disabled=true; warning.classList.remove('visible'); await loadSprites(); await initFaceLandmarker(); await initCameraAndMic(); setStatus('CAMERA ON'); } catch(error){ console.error(error); cameraReady=false; btnStart.disabled=false; setStatus('MANUAL MODE'); showWarning(String(error.message||error)+'. Open in Safari/Chrome directly, not inside Telegram. Manual buttons still work.'); } });
-btnRecord.addEventListener('click', ()=>{ try{ startRecording(); } catch(error){ console.error(error); showWarning('RECORD ERROR: '+error.message); } });
-btnStop.addEventListener('click', ()=>{ stopRecording().catch(error=>{ console.error(error); showWarning('STOP ERROR: '+error.message); }); });
-showCameraInput.addEventListener('change', ()=>{ video.classList.toggle('visible', showCameraInput.checked); });
-qualitySelect.addEventListener('change', updateExportCanvasSize);
-modeSelect.addEventListener('change', ()=>{ formatEl.textContent = modeSelect.value==='png' ? 'ZIP PNG ALPHA' : 'WEBM GREEN'; });
-document.querySelectorAll('[data-manual]').forEach(button=>{ button.addEventListener('click', ()=>{ stableEmotion=button.dataset.manual; currentEmotion=stableEmotion; head.x=0; head.y=0; }); });
-await loadSprites(); updateExportCanvasSize(); stableEmotion='static'; render(ctx, canvas.width, canvas.height, '#000000', false); render(alphaCtx, alphaCanvas.width, alphaCanvas.height, null, true); render(greenCtx, greenCanvas.width, greenCanvas.height, EXPORT_GREEN, false); loop(); setStatus('READY');
-</script></body></html>
+const EXPORT_GREEN = "#00FF00";
+
+const preview = document.querySelector("#preview");
+const previewCtx = preview.getContext("2d", { alpha: false });
+
+const recordCanvas = document.createElement("canvas");
+const recordCtx = recordCanvas.getContext("2d", { alpha: false });
+
+const video = document.querySelector("#camera");
+
+const btnStart = document.querySelector("#btnStart");
+const btnRecord = document.querySelector("#btnRecord");
+const btnStop = document.querySelector("#btnStop");
+const download = document.querySelector("#download");
+const warning = document.querySelector("#warning");
+
+const statusEl = document.querySelector("#status");
+const emotionEl = document.querySelector("#emotion");
+const formatEl = document.querySelector("#format");
+const exportSizeEl = document.querySelector("#exportSize");
+
+const scaleInput = document.querySelector("#scale");
+const moveInput = document.querySelector("#move");
+const smoothInput = document.querySelector("#smooth");
+const showCameraInput = document.querySelector("#showCamera");
+const qualitySelect = document.querySelector("#quality");
+
+let sprites = {};
+let faceLandmarker = null;
+let userStream = null;
+let micStream = null;
+let audioCtx = null;
+let analyser = null;
+let audioData = null;
+
+let recorder = null;
+let chunks = [];
+let recordingMime = "";
+
+let lastVideoTime = -1;
+let currentEmotion = "static";
+let stableEmotion = "static";
+let stableSince = performance.now();
+let cameraReady = false;
+
+let head = { x: 0, y: 0 };
+let smoothHead = { x: 0, y: 0 };
+
+function getExportSettings() {
+  if (qualitySelect.value === "4k") {
+    return {
+      width: 3840,
+      height: 2160,
+      fps: 30,
+      videoBitsPerSecond: 90000000,
+      label: "3840×2160"
+    };
+  }
+
+  return {
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    videoBitsPerSecond: 45000000,
+    label: "1920×1080"
+  };
+}
+
+function updateExportCanvasSize() {
+  const settings = getExportSettings();
+
+  recordCanvas.width = settings.width;
+  recordCanvas.height = settings.height;
+
+  exportSizeEl.textContent = settings.label;
+}
+
+function setStatus(text) {
+  statusEl.textContent = text;
+}
+
+function showWarning(text) {
+  warning.textContent = text;
+  warning.classList.add("visible");
+}
+
+function hideWarning() {
+  warning.classList.remove("visible");
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => resolve(img);
+
+    img.onerror = () => {
+      reject(new Error("Не загрузилась картинка: " + src + ". Проверь, что PNG лежит рядом с index.html."));
+    };
+
+    img.src = src;
+  });
+}
+
+function isBlackPixel(data, index) {
+  return (
+    data[index] < 12 &&
+    data[index + 1] < 12 &&
+    data[index + 2] < 12 &&
+    data[index + 3] > 0
+  );
+}
+
+function removeOuterBlackBackground(img) {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const visited = new Uint8Array(width * height);
+  const stack = [];
+
+  function push(x, y) {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+
+    const point = y * width + x;
+    if (visited[point]) return;
+
+    const index = point * 4;
+    if (!isBlackPixel(data, index)) return;
+
+    visited[point] = 1;
+    stack.push(point);
+  }
+
+  for (let x = 0; x < width; x++) {
+    push(x, 0);
+    push(x, height - 1);
+  }
+
+  for (let y = 0; y < height; y++) {
+    push(0, y);
+    push(width - 1, y);
+  }
+
+  while (stack.length) {
+    const point = stack.pop();
+
+    const x = point % width;
+    const y = Math.floor(point / width);
+    const index = point * 4;
+
+    data[index + 3] = 0;
+
+    push(x + 1, y);
+    push(x - 1, y);
+    push(x, y + 1);
+    push(x, y - 1);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  return canvas;
+}
+
+async function loadSprites() {
+  const loaded = {};
+
+  for (const [name, url] of Object.entries(SPRITE_URLS)) {
+    const image = await loadImage(url);
+    loaded[name] = removeOuterBlackBackground(image);
+  }
+
+  sprites = loaded;
+}
+
+function getBlend(blendshapes, name) {
+  const item = blendshapes?.categories?.find(category => category.categoryName === name);
+  return item ? item.score : 0;
+}
+
+function getMicVolume() {
+  if (!analyser || !audioData) return 0;
+
+  analyser.getByteTimeDomainData(audioData);
+
+  let sum = 0;
+
+  for (const value of audioData) {
+    const normalized = (value - 128) / 128;
+    sum += normalized * normalized;
+  }
+
+  return Math.sqrt(sum / audioData.length);
+}
+
+function chooseSprite(result, volume) {
+  const blendshapes = result?.faceBlendshapes?.[0];
+
+  if (!blendshapes) {
+    return volume > 0.07 ? "open_mouth" : stableEmotion;
+  }
+
+  const jawOpen = getBlend(blendshapes, "jawOpen");
+  const browInnerUp = getBlend(blendshapes, "browInnerUp");
+  const smile = (
+    getBlend(blendshapes, "mouthSmileLeft") +
+    getBlend(blendshapes, "mouthSmileRight")
+  ) / 2;
+  const eyeWide = (
+    getBlend(blendshapes, "eyeWideLeft") +
+    getBlend(blendshapes, "eyeWideRight")
+  ) / 2;
+
+  if (jawOpen > 0.45 && (browInnerUp > 0.18 || eyeWide > 0.18)) {
+    return "surprised";
+  }
+
+  if (browInnerUp > 0.34 || eyeWide > 0.30 || smile > 0.35) {
+    return "brows";
+  }
+
+  if (jawOpen > 0.13 || volume > 0.065) {
+    return "open_mouth";
+  }
+
+  return "static";
+}
+
+function stabilizeEmotion(nextEmotion) {
+  const now = performance.now();
+
+  if (nextEmotion !== currentEmotion) {
+    currentEmotion = nextEmotion;
+    stableSince = now;
+    return stableEmotion;
+  }
+
+  const delay = nextEmotion === "open_mouth" ? 35 : 110;
+
+  if (now - stableSince > delay) {
+    stableEmotion = nextEmotion;
+  }
+
+  return stableEmotion;
+}
+
+function updateHeadFromLandmarks(result) {
+  const landmarks = result?.faceLandmarks?.[0];
+
+  if (!landmarks || !landmarks[1]) {
+    head.x *= 0.92;
+    head.y *= 0.92;
+    return;
+  }
+
+  const nose = landmarks[1];
+  const power = Number(moveInput.value);
+
+  head.x = (0.5 - nose.x) * power * 1.8;
+  head.y = (nose.y - 0.5) * power * 1.15;
+}
+
+function render(targetCtx, width, height, background) {
+  targetCtx.imageSmoothingEnabled = false;
+
+  targetCtx.fillStyle = background;
+  targetCtx.fillRect(0, 0, width, height);
+
+  const sprite = sprites[stableEmotion] || sprites.static;
+  if (!sprite) return;
+
+  const smoothing = Number(smoothInput.value) / 100;
+
+  smoothHead.x = smoothHead.x * smoothing + head.x * (1 - smoothing);
+  smoothHead.y = smoothHead.y * smoothing + head.y * (1 - smoothing);
+
+  const exportFactor = height / 1080;
+  const scale = Number(scaleInput.value) * exportFactor;
+
+  const spriteWidth = Math.round(sprite.width * scale);
+  const spriteHeight = Math.round(sprite.height * scale);
+
+  const x = Math.round(width / 2 - spriteWidth / 2 + smoothHead.x * exportFactor);
+  const y = Math.round(height / 2 - spriteHeight / 2 + smoothHead.y * exportFactor);
+
+  targetCtx.drawImage(sprite, x, y, spriteWidth, spriteHeight);
+}
+
+async function initFaceLandmarker() {
+  if (faceLandmarker) return;
+
+  setStatus("LOAD MEDIAPIPE");
+
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+  );
+
+  faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: MODEL_URL,
+      delegate: "GPU"
+    },
+    outputFaceBlendshapes: true,
+    runningMode: "VIDEO",
+    numFaces: 1
+  });
+}
+
+async function initCameraAndMic() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("CAMERA API IS NOT AVAILABLE IN THIS BROWSER");
+  }
+
+  if (!window.isSecureContext) {
+    throw new Error("OPEN THROUGH HTTPS OR LOCALHOST");
+  }
+
+  setStatus("ASK CAMERA");
+
+  userStream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      facingMode: "user"
+    },
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true
+    }
+  });
+
+  video.srcObject = userStream;
+  await video.play();
+
+  const audioTracks = userStream.getAudioTracks();
+  micStream = new MediaStream(audioTracks);
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await audioCtx.resume();
+
+  if (audioTracks.length) {
+    const source = audioCtx.createMediaStreamSource(micStream);
+
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+
+    source.connect(analyser);
+
+    audioData = new Uint8Array(analyser.frequencyBinCount);
+  }
+
+  cameraReady = true;
+}
+
+function loop() {
+  if (
+    cameraReady &&
+    video.readyState >= 2 &&
+    video.currentTime !== lastVideoTime &&
+    faceLandmarker
+  ) {
+    lastVideoTime = video.currentTime;
+
+    const result = faceLandmarker.detectForVideo(video, performance.now());
+    const volume = getMicVolume();
+
+    updateHeadFromLandmarks(result);
+
+    const nextEmotion = chooseSprite(result, volume);
+    stabilizeEmotion(nextEmotion);
+  } else {
+    head.x *= 0.96;
+    head.y *= 0.96;
+  }
+
+  render(previewCtx, preview.width, preview.height, "#000000");
+  render(recordCtx, recordCanvas.width, recordCanvas.height, EXPORT_GREEN);
+
+  emotionEl.textContent = stableEmotion.toUpperCase();
+
+  requestAnimationFrame(loop);
+}
+
+function selectMp4MimeType() {
+  const types = [
+    "video/mp4;codecs=avc1.640034,mp4a.40.2",
+    "video/mp4;codecs=avc1.640033,mp4a.40.2",
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4;codecs=h264,aac",
+    "video/mp4"
+  ];
+
+  return types.find(type => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function startRecording() {
+  updateExportCanvasSize();
+
+  chunks = [];
+
+  download.classList.add("hidden");
+  download.removeAttribute("href");
+
+  const settings = getExportSettings();
+
+  const mimeType = selectMp4MimeType();
+
+  if (!mimeType) {
+    showWarning("MP4 recording is not supported in this browser. Open this page in Chrome / Edge / Safari on desktop.");
+    setStatus("NO MP4");
+    return;
+  }
+
+  const canvasStream = recordCanvas.captureStream(settings.fps);
+
+  const audioTracks = micStream ? micStream.getAudioTracks() : [];
+
+  const mixedStream = new MediaStream([
+    ...canvasStream.getVideoTracks(),
+    ...audioTracks
+  ]);
+
+  recorder = new MediaRecorder(mixedStream, {
+    mimeType,
+    videoBitsPerSecond: settings.videoBitsPerSecond,
+    audioBitsPerSecond: 192000
+  });
+
+  recorder.ondataavailable = event => {
+    if (event.data && event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  };
+
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: mimeType });
+    const url = URL.createObjectURL(blob);
+
+    download.href = url;
+    download.download = `danyapez_avatar_${settings.label.replace("×", "x")}_${new Date().toISOString().replace(/[:.]/g, "-")}.mp4`;
+
+    download.classList.remove("hidden");
+
+    btnRecord.disabled = false;
+    btnStop.disabled = true;
+
+    setStatus("READY");
+  };
+
+  recorder.start(250);
+
+  formatEl.textContent = "MP4";
+
+  btnRecord.disabled = true;
+  btnStop.disabled = false;
+
+  setStatus("REC MP4");
+}
+
+btnStart.addEventListener("click", async () => {
+  try {
+    btnStart.disabled = true;
+    hideWarning();
+
+    await loadSprites();
+    await initFaceLandmarker();
+    await initCameraAndMic();
+
+    setStatus("CAMERA ON");
+  } catch (error) {
+    console.error(error);
+
+    cameraReady = false;
+    btnStart.disabled = false;
+
+    setStatus("MANUAL MODE");
+
+    const message = String(error && error.message ? error.message : error);
+
+    showWarning(
+      message + ". Open in Safari / Chrome directly, not inside Telegram. Manual buttons still work."
+    );
+  }
+});
+
+btnRecord.addEventListener("click", () => {
+  try {
+    startRecording();
+  } catch (error) {
+    console.error(error);
+    showWarning("RECORD ERROR: " + error.message);
+  }
+});
+
+btnStop.addEventListener("click", () => {
+  if (recorder && recorder.state !== "inactive") {
+    recorder.stop();
+  }
+});
+
+showCameraInput.addEventListener("change", () => {
+  video.classList.toggle("visible", showCameraInput.checked);
+});
+
+qualitySelect.addEventListener("change", () => {
+  updateExportCanvasSize();
+  render(recordCtx, recordCanvas.width, recordCanvas.height, EXPORT_GREEN);
+});
+
+document.querySelectorAll("[data-manual]").forEach(button => {
+  button.addEventListener("click", () => {
+    stableEmotion = button.dataset.manual;
+    currentEmotion = stableEmotion;
+    head.x = 0;
+    head.y = 0;
+  });
+});
+
+await loadSprites();
+
+updateExportCanvasSize();
+
+stableEmotion = "static";
+
+render(previewCtx, preview.width, preview.height, "#000000");
+render(recordCtx, recordCanvas.width, recordCanvas.height, EXPORT_GREEN);
+
+loop();
+
+setStatus("READY");
+</script>
+</body>
+</html>
