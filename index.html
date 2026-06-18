@@ -31,44 +31,40 @@ input[type=range]{width:100%;accent-color:#fff}
 input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 .status{border:1px solid rgba(255,255,255,.25);padding:14px;font-size:8px;line-height:2}
 .status span{color:#7741F6}
+
 .warn{display:none;border:1px solid #ffcc00;color:#ffcc00;padding:12px;font-size:8px;line-height:1.7}
 .warn.visible{display:block}
 
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .brand h1{margin:0}
 
-
-.progressBox{
-  display:grid;
-  gap:8px;
-  border:1px solid rgba(255,255,255,.25);
-  padding:12px;
-  background:rgba(119,65,246,.08);
-}
-.progressMeta{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  font-size:8px;
-  line-height:1.6;
-  color:#fff;
-}
-.progressMeta span:last-child{
-  color:#7741F6;
-}
-.progressTrack{
-  width:100%;
-  height:8px;
-  border:1px solid rgba(119,65,246,.55);
-  background:#000;
+#stop{
+  position:relative;
   overflow:hidden;
 }
-.progressFill{
+#stop .stopText{
+  position:relative;
+  z-index:2;
+}
+#stop .stopFill{
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
   width:0%;
-  height:100%;
   background:#7741F6;
-  box-shadow:0 0 14px rgba(119,65,246,.8);
+  z-index:1;
+  opacity:.95;
   transition:width .18s linear;
+}
+#stop.converting{
+  color:#fff;
+  border-color:#7741F6;
+  background:rgba(119,65,246,.12);
+}
+#stop.converting:hover{
+  color:#fff;
+  background:rgba(119,65,246,.12);
 }
 
 @media(max-width:900px){
@@ -101,17 +97,9 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <div class="buttons">
 <button id="start">START CAMERA</button>
 <button id="rec">REC</button>
-<button id="stop" disabled>STOP</button>
+<button id="stop" disabled><span id="stopFill" class="stopFill"></span><span id="stopText" class="stopText">STOP</span></button>
 </div>
 
-<div class="progressBox">
-  <div class="progressMeta">
-    <span id="progressLabel">WAIT</span>
-    <span id="progressPercent">0%</span>
-  </div>
-  <div class="progressTrack">
-    <div id="progressFill" class="progressFill"></div>
-  </div>
 </div>
 
 <a id="downloadZip" class="hidden" download>DOWNLOAD CAPCUT MP4</a>
@@ -122,13 +110,6 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <button data-s="brows">BROWS</button>
 <button data-s="surprised">WOW</button>
 </div>
-
-<label>EXPORT
-<select id="size">
-<option value="1080" selected>1920×1080 MP4 GREEN STABLE</option>
-<option value="4k">3840×2160 MP4 GREEN HEAVY</option>
-</select>
-</label>
 
 <label>SIZE
 <input id="scale" type="range" min="0.7" max="2.6" step="0.05" value="1.55">
@@ -146,16 +127,13 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <input id="showCam" type="checkbox"><span>SHOW CAMERA</span>
 </label>
 
-<div class="status">
-<div>STATUS: <span id="status">WAIT</span></div>
-<div>REC TIME: <span id="recordTime">00:00</span></div>
-<div>SPRITE: <span id="sprite">STATIC</span></div>
-<div>PNG: <span>ORIGINAL</span></div>
-<div>VIDEO: <span>MP4 #00FF00</span></div>
-<div>AUDIO: <span>INSIDE MP4</span></div>
-<div>EXPORT: <span id="exportInfo">3840×2160</span></div>
-<div>FORMAT: <span id="format">MP4 FIX</span></div>
-<div>FIX: <span id="fixStatus">WAIT</span></div>
+<div class="hidden">
+  <span id="status">WAIT</span>
+  <span id="sprite">STATIC</span>
+  <span id="exportInfo">1920×1080</span>
+  <span id="format">MP4 FIX</span>
+  <span id="fixStatus">WAIT</span>
+  <span id="recordTime">00:00</span>
 </div>
 
 </aside>
@@ -178,8 +156,8 @@ const video=document.querySelector("#camera");
 
 const el={
  start:document.querySelector("#start"),
- rec:document.querySelector("#rec"),progressFill:document.querySelector("#progressFill"),progressLabel:document.querySelector("#progressLabel"),progressPercent:document.querySelector("#progressPercent"),recordTime:document.querySelector("#recordTime"),
- stop:document.querySelector("#stop"),
+ rec:document.querySelector("#rec"),recordTime:document.querySelector("#recordTime"),
+ stop:document.querySelector("#stop"),stopText:document.querySelector("#stopText"),stopFill:document.querySelector("#stopFill"),
  downloadZip:document.querySelector("#downloadZip"),
  warn:document.querySelector("#warn"),
  status:document.querySelector("#status"),
@@ -189,8 +167,7 @@ const el={
  scale:document.querySelector("#scale"),
  move:document.querySelector("#move"),
  smooth:document.querySelector("#smooth"),
- showCam:document.querySelector("#showCam"),
- size:document.querySelector("#size")
+ showCam:document.querySelector("#showCam")
 };
 
 let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null;
@@ -200,6 +177,7 @@ let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
 const ffmpeg=new FFmpeg();
 let ffmpegReady=false;
+let ffmpegLoading=false;
 let recordStartedAt=0;
 let recordTimer=null;
 let ffmpegProgressAttached=false;
@@ -219,19 +197,24 @@ function formatTime(ms){
 
 function setProgress(label,percent){
  const p=Math.max(0,Math.min(100,Math.round(percent||0)));
- el.progressLabel.textContent=label;
- el.progressPercent.textContent=`${p}%`;
- el.progressFill.style.width=`${p}%`;
+ el.fixStatus.textContent=label+" "+p+"%";
+ if(el.stopFill)el.stopFill.style.width=`${p}%`;
+ if(el.stopText){
+  el.stopText.textContent = label==="DONE" ? "DONE 100%" : `${label} ${p}%`;
+ }
 }
 
 function startRecordTimer(){
  recordStartedAt=performance.now();
  if(recordTimer)clearInterval(recordTimer);
  setProgress("REC",0);
+ el.stop.classList.remove("converting");
+ if(el.stopFill)el.stopFill.style.width="0%";
  const tick=()=>{
   const t=formatTime(performance.now()-recordStartedAt);
   el.recordTime.textContent=t;
   el.rec.textContent=`REC ${t}`;
+  if(el.stopText)el.stopText.textContent=`STOP ${t}`;
  };
  tick();
  recordTimer=setInterval(tick,250);
@@ -243,11 +226,12 @@ function stopRecordTimer(){
  const t=formatTime(performance.now()-recordStartedAt);
  el.recordTime.textContent=t;
  el.rec.textContent="CONVERT...";
+ el.stop.classList.add("converting");
+ if(el.stopFill)el.stopFill.style.width="0%";
+ if(el.stopText)el.stopText.textContent="PREPARE 0%";
 }
 
-
 function exportSettings(){
- if(el.size.value==="4k")return {w:3840,h:2160,br:30000000,label:"3840×2160"};
  return {w:1920,h:1080,br:12000000,label:"1920×1080"};
 }
 
@@ -465,11 +449,18 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
-
-async function loadFfmpeg(){
+async function loadFfmpeg(background=false){
  if(ffmpegReady)return;
- el.fixStatus.textContent="LOAD";
- setProgress("LOAD FFMPEG",5);
+ if(ffmpegLoading){
+  while(!ffmpegReady){
+   await new Promise(resolve=>setTimeout(resolve,120));
+  }
+  return;
+ }
+
+ ffmpegLoading=true;
+ el.fixStatus.textContent=background ? "PRELOAD" : "LOAD";
+ if(!background)setProgress("LOAD FFMPEG",5);
 
  if(!ffmpegProgressAttached){
   ffmpeg.on("progress",({progress,time})=>{
@@ -484,9 +475,11 @@ async function loadFfmpeg(){
   coreURL:await toBlobURL(`${baseURL}/ffmpeg-core.js`,"text/javascript"),
   wasmURL:await toBlobURL(`${baseURL}/ffmpeg-core.wasm`,"application/wasm")
  });
+
  ffmpegReady=true;
+ ffmpegLoading=false;
  el.fixStatus.textContent="READY";
- setProgress("FFMPEG READY",12);
+ if(!background)setProgress("FFMPEG READY",12);
 }
 
 async function makeCapCutMp4(inputBlob,settings,stamp){
@@ -494,7 +487,7 @@ async function makeCapCutMp4(inputBlob,settings,stamp){
   setStatus("FIX MP4");
   el.fixStatus.textContent="REMUX";
   setProgress("PREPARE MP4",15);
-  await loadFfmpeg();
+  await loadFfmpeg(false);
 
   try{await ffmpeg.deleteFile("input.mp4");await ffmpeg.deleteFile("output.mp4");}catch(e){}
 
@@ -542,7 +535,7 @@ function startRec(){
 
  chunks=[];
  el.downloadZip.classList.add("hidden");
- setProgress("WAIT",0);
+ if(el.stopFill)el.stopFill.style.width="0%"; if(el.stopText)el.stopText.textContent="STOP"; el.fixStatus.textContent="WAIT";
  el.recordTime.textContent="00:00";
 
  const settings=exportSettings();
@@ -581,6 +574,9 @@ function startRec(){
   el.rec.disabled=false;
   el.rec.textContent="REC";
   el.stop.disabled=true;
+  el.stop.classList.add("converting");
+  if(el.stopFill)el.stopFill.style.width="100%";
+  if(el.stopText)el.stopText.textContent="DONE 100%";
   setStatus("READY");
  };
 
@@ -591,6 +587,9 @@ function startRec(){
  el.fixStatus.textContent="REC";
  el.rec.disabled=true;
  el.stop.disabled=false;
+ el.stop.classList.remove("converting");
+ if(el.stopFill)el.stopFill.style.width="0%";
+ if(el.stopText)el.stopText.textContent="STOP 00:00";
  setStatus("REC MP4");
 }
 
@@ -602,6 +601,7 @@ el.start.onclick=async()=>{
   await initFace();
   await initCamera();
   setStatus("CAMERA ON");
+  loadFfmpeg(true).catch(error=>console.warn("FFMPEG preload failed",error));
  }catch(e){
   console.error(e);
   el.start.disabled=false;
@@ -615,7 +615,6 @@ el.rec.onclick=()=>{try{startRec()}catch(e){console.error(e);warn("REC ERROR: "+
 el.stop.onclick=()=>{if(recorder&&recorder.state!=="inactive")recorder.stop()};
 
 el.showCam.onchange=()=>video.classList.toggle("visible",el.showCam.checked);
-el.size.onchange=resizeRec;
 
 document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{
  stable=b.dataset.s;
