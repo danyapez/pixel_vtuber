@@ -140,6 +140,7 @@ const el={
 
 let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null;
 let recorder=null, chunks=[], lastVideoTime=-1;
+let framePumpTimer=null;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
@@ -414,6 +415,28 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
+
+function startFramePump(track,fps){
+ if(framePumpTimer)clearInterval(framePumpTimer);
+ const interval=Math.round(1000/fps);
+
+ framePumpTimer=setInterval(()=>{
+  try{
+   render(rctx,recCanvas.width,recCanvas.height,GREEN);
+   if(track && typeof track.requestFrame==="function"){
+    track.requestFrame();
+   }
+  }catch(e){
+   console.warn("frame pump error",e);
+  }
+ },interval);
+}
+
+function stopFramePump(){
+ if(framePumpTimer)clearInterval(framePumpTimer);
+ framePumpTimer=null;
+}
+
 function startRec(){
  resizeRec();
 
@@ -430,7 +453,15 @@ function startRec(){
  el.fixStatus.textContent="REC";
 
  const settings=exportSettings();
- const videoStream=recCanvas.captureStream(30);
+
+ // Важно для CapCut: не captureStream(30), а ручная подача кадров.
+ // Так файл получается ближе к постоянным 30 fps, без хаотичной частоты кадров.
+ const videoStream=recCanvas.captureStream(0);
+ const videoTrack=videoStream.getVideoTracks()[0];
+
+ if(videoTrack && videoTrack.applyConstraints){
+  videoTrack.applyConstraints({frameRate:30}).catch(()=>{});
+ }
 
  const audioTracks = recorderAudioDestination
   ? recorderAudioDestination.stream.getAudioTracks()
@@ -447,20 +478,21 @@ function startRec(){
 
  recorder=new MediaRecorder(mixedStream,{
   mimeType:mime,
-  videoBitsPerSecond:settings.br,
-  audioBitsPerSecond:160000
+  videoBitsPerSecond:12000000,
+  audioBitsPerSecond:192000
  });
 
  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
 
  recorder.onstop=()=>{
+  stopFramePump();
   stopRecordTimer();
 
   const blob=new Blob(chunks,{type:mime});
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
 
   el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_direct44100_${stamp}.mp4`;
+  el.downloadZip.download=`danyapez_avatar_1920x1080_30fps_aac441_${stamp}.mp4`;
   el.downloadZip.classList.remove("hidden");
 
   el.rec.disabled=false;
@@ -468,13 +500,20 @@ function startRec(){
   el.stop.disabled=true;
   el.stop.textContent="STOP";
   el.fixStatus.textContent="READY";
+  el.format.textContent="MP4";
   setStatus("READY");
 
-  // Автоскачивание сразу после STOP. Кнопка DOWNLOAD остаётся как запасной вариант.
   setTimeout(()=>el.downloadZip.click(),120);
  };
 
+ // Один цельный blob без нарезки timeslice.
  recorder.start();
+
+ // Первый кадр сразу, потом фиксированные 30 fps.
+ render(rctx,recCanvas.width,recCanvas.height,GREEN);
+ if(videoTrack && typeof videoTrack.requestFrame==="function")videoTrack.requestFrame();
+ startFramePump(videoTrack,30);
+
  startRecordTimer();
 
  el.format.textContent="MP4";
