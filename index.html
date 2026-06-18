@@ -73,7 +73,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 
 </div>
 
-<a id="downloadZip" class="hidden" download>DOWNLOAD VIDEO</a>
+<a id="downloadZip" class="hidden" download>DOWNLOAD MP4</a>
 
 <div class="manual">
 <button data-s="static">STATIC</button>
@@ -102,7 +102,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
   <span id="status">WAIT</span>
   <span id="sprite">STATIC</span>
   <span id="exportInfo">1920×1080</span>
-  <span id="format">WEBM</span>
+  <span id="format">MP4</span>
   <span id="fixStatus">WAIT</span>
   <span id="recordTime">00:00</span>
 </div>
@@ -195,22 +195,14 @@ function resizeRec(){
  el.exportInfo.textContent=s.label;
 }
 
-function videoMime(){
+function mp4Mime(){
  const types=[
-  "video/webm;codecs=vp9,opus",
-  "video/webm;codecs=vp8,opus",
-  "video/webm;codecs=opus",
-  "video/webm",
   "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
   "video/mp4;codecs=avc1.640028,mp4a.40.2",
   "video/mp4;codecs=h264,aac",
   "video/mp4"
  ];
  return types.find(t=>MediaRecorder.isTypeSupported(t))||"";
-}
-
-function extFromMime(mime){
- return mime.includes("webm") ? "webm" : "mp4";
 }
 
 function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
@@ -322,7 +314,7 @@ async function initCamera(){
   analyser.fftSize=512;
 
   // Отдельный аудио-выход для MediaRecorder.
-  // Так браузер заново кодирует микрофон внутрь VIDEO,
+  // Так браузер заново кодирует микрофон внутрь MP4,
   // часто CapCut читает такой звук стабильнее.
   recorderAudioDestination=audioCtx.createMediaStreamDestination();
 
@@ -421,10 +413,10 @@ function loop(){
 function startRec(){
  resizeRec();
 
- const mime=videoMime();
+ const mime=mp4Mime();
  if(!mime){
-  warn("VIDEO RECORDING IS NOT SUPPORTED IN THIS BROWSER. OPEN IN CHROME/EDGE DESKTOP OR SAFARI.");
-  setStatus("NO FORMAT");
+  warn("MP4 RECORDING IS NOT SUPPORTED IN THIS BROWSER. OPEN IN CHROME/EDGE DESKTOP OR SAFARI.");
+  setStatus("NO MP4");
   return;
  }
 
@@ -434,7 +426,6 @@ function startRec(){
  el.fixStatus.textContent="REC";
 
  const settings=exportSettings();
- el.format.textContent=extFromMime(mime).toUpperCase();
  const videoStream=recCanvas.captureStream(30);
 
  const audioTracks = recorderAudioDestination
@@ -465,7 +456,7 @@ function startRec(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
 
   el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_instant_${stamp}.${extFromMime(mime)}`;
+  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_instant_${stamp}.mp4`;
   el.downloadZip.classList.remove("hidden");
 
   el.rec.disabled=false;
@@ -482,11 +473,11 @@ function startRec(){
  recorder.start(1000);
  startRecordTimer();
 
- el.format.textContent=extFromMime(mime).toUpperCase();
+ el.format.textContent="MP4";
  el.rec.disabled=true;
  el.stop.disabled=false;
  el.stop.textContent="STOP";
- setStatus("REC "+extFromMime(mime).toUpperCase());
+ setStatus("REC MP4");
 }
 
 el.start.onclick=async()=>{
