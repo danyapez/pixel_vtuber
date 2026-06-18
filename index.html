@@ -418,26 +418,64 @@ function loop(){
 }
 
 
+
+let fixVisualTimer=null;
+
+function startFixVisual(label){
+ if(fixVisualTimer)clearInterval(fixVisualTimer);
+ const start=performance.now();
+ let dots=0;
+ const tick=()=>{
+  dots=(dots+1)%4;
+  const sec=Math.floor((performance.now()-start)/1000);
+  el.stop.textContent=`${label}${".".repeat(dots)} ${sec}s`;
+ };
+ tick();
+ fixVisualTimer=setInterval(tick,350);
+}
+
+function stopFixVisual(){
+ if(fixVisualTimer)clearInterval(fixVisualTimer);
+ fixVisualTimer=null;
+}
+
 async function loadFfmpegFast(background=false){
  if(ffmpegReady)return;
+
  if(ffmpegLoading){
+  if(!background){
+   el.stop.textContent="LOAD FIX";
+   setStatus("LOAD FIX");
+   startFixVisual("LOAD FIX");
+  }
+
   while(!ffmpegReady){
    await new Promise(resolve=>setTimeout(resolve,120));
   }
+
+  if(!background)stopFixVisual();
   return;
  }
 
  ffmpegLoading=true;
+
  if(!background){
   el.stop.textContent="LOAD FIX";
   setStatus("LOAD FIX");
+  startFixVisual("LOAD FIX");
  }
 
  if(!ffmpegProgressAttached){
   ffmpeg.on("progress",({progress})=>{
-   const p=Math.max(1,Math.min(99,Math.round((progress||0)*100)));
-   el.stop.textContent=`FIX ${p}%`;
+   if(!progress && progress !== 0)return;
+   const p=Math.max(1,Math.min(99,Math.round(progress*100)));
+   el.stop.textContent=`CONVERT ${p}%`;
   });
+
+  ffmpeg.on("log",({message})=>{
+   console.log(message);
+  });
+
   ffmpegProgressAttached=true;
  }
 
@@ -450,38 +488,63 @@ async function loadFfmpegFast(background=false){
 
  ffmpegReady=true;
  ffmpegLoading=false;
+
+ if(!background){
+  stopFixVisual();
+  el.stop.textContent="FIX READY";
+ }
+
  setStatus("FIX READY");
 }
 
 async function fastCapCutFix(inputBlob){
  try{
-  await loadFfmpegFast(false);
+  el.stop.textContent="LOAD FIX";
+  setStatus("LOAD FIX");
 
-  el.stop.textContent="FIX 1%";
-  setStatus("FAST FIX");
+  await loadFfmpegFast(false);
 
   try{
    await ffmpeg.deleteFile("input.mp4");
    await ffmpeg.deleteFile("output.mp4");
   }catch(e){}
 
+  el.stop.textContent="WRITE FILE";
+  setStatus("WRITE FILE");
   await ffmpeg.writeFile("input.mp4",await fetchFile(inputBlob));
 
-  // Самый быстрый вариант: без перекодирования.
-  // Просто пересобираем MP4-контейнер и ставим faststart.
-  // Обычно это в разы быстрее, чем кодировать AAC заново.
+  // Реальная быстрая конвертация для CapCut:
+  // видео НЕ перекодируем, чтобы было быстро;
+  // звук перекодируем в AAC 48 kHz stereo — это чаще всего и нужно CapCut.
+  el.stop.textContent="CONVERT AUDIO";
+  setStatus("CONVERT AUDIO");
+  startFixVisual("CONVERT");
+
   await ffmpeg.exec([
    "-i","input.mp4",
-   "-map","0",
-   "-c","copy",
+   "-map","0:v:0",
+   "-map","0:a:0?",
+   "-c:v","copy",
+   "-c:a","aac",
+   "-b:a","160k",
+   "-ar","48000",
+   "-ac","2",
    "-movflags","+faststart",
    "output.mp4"
   ]);
 
+  stopFixVisual();
+
+  el.stop.textContent="FINALIZE";
+  setStatus("FINALIZE");
+
   const fixedData=await ffmpeg.readFile("output.mp4");
   el.stop.textContent="DONE";
+  setStatus("DONE");
+
   return new Blob([fixedData.buffer],{type:"video/mp4"});
  }catch(e){
+  stopFixVisual();
   console.error(e);
   warn("FAST FIX FAILED. DOWNLOADING RAW MP4. "+String(e.message||e));
   el.stop.textContent="RAW MP4";
@@ -531,7 +594,8 @@ function startRec(){
  recorder.onstop=async()=>{
   stopRecordTimer();
   el.stop.disabled=true;
-  el.stop.textContent="FIX 0%";
+  el.stop.textContent="START FIX";
+  setStatus("START FIX");
 
   const rawBlob=new Blob(chunks,{type:mime});
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
@@ -573,7 +637,6 @@ el.start.onclick=async()=>{
   await initFace();
   await initCamera();
   setStatus("CAMERA ON");
-  loadFfmpegFast(true).catch(e=>console.warn("FFMPEG preload failed",e));
  }catch(e){
   console.error(e);
   el.start.disabled=false;
@@ -602,6 +665,7 @@ render(pctx,preview.width,preview.height,"#000000");
 render(rctx,recCanvas.width,recCanvas.height,GREEN);
 loop();
 setStatus("READY");
+loadFfmpegFast(true).catch(e=>console.warn("FFMPEG preload on page load failed",e));
 </script>
 </body>
 </html>
