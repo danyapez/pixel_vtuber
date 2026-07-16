@@ -45,88 +45,25 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
  h1{font-size:12px} button,a,select{font-size:7px;padding:12px 9px}
 }
 
-.teleprompter-editor,
-.teleprompter-reader,
-.voice-box,
-.ai-box{
+.voice-style-box{
   border:1px solid rgba(255,255,255,.25);
   padding:12px;
   display:grid;
-  gap:10px;
+  gap:9px;
 }
-.teleprompter-editor textarea{
-  width:100%;
-  min-height:130px;
-  resize:vertical;
-  border:1px solid rgba(255,255,255,.35);
-  background:#000;
-  color:#fff;
-  padding:12px;
-  font:16px/1.5 Arial,sans-serif;
-}
-.teleprompter-reader{
-  height:240px;
-  overflow:hidden;
-  background:#000;
-}
-.teleprompter-scroll{
-  height:100%;
-  overflow-y:auto;
-  overscroll-behavior:contain;
-  touch-action:pan-y;
-  cursor:grab;
-  -webkit-overflow-scrolling:touch;
-}
-.teleprompter-text{
-  padding:85px 14px 180px;
-  white-space:pre-wrap;
-  font:28px/1.45 Arial,sans-serif;
-  text-align:center;
-}
-.block-title{
+.voice-style-title{
   color:#7741F6;
   font-size:8px;
   line-height:1.5;
 }
-.rec-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:9px;
-}
-.voice-box button.active,
-#aiRec.active{
+#voiceStyleToggle.active{
   background:#7741F6;
   border-color:#7741F6;
-}
-.ai-key-row{
-  display:grid;
-  grid-template-columns:1fr auto;
-  gap:8px;
-}
-.ai-key-row input{
-  min-width:0;
-  width:100%;
-  border:1px solid rgba(255,255,255,.35);
-  background:#000;
   color:#fff;
-  padding:12px;
-  font:14px Arial,sans-serif;
 }
-.ai-key-row button{width:auto;min-width:110px}
-.ai-key-state{
-  border:1px solid #41a260;
-  background:rgba(65,162,96,.15);
-  color:#c9ffd9;
-  padding:10px 12px;
-  font:12px/1.4 Arial,sans-serif;
-}
-.small-note{
+.voice-style-note{
   color:#777;
   font:11px/1.45 Arial,sans-serif;
-}
-@media(max-width:520px){
- .rec-grid,.ai-key-row{grid-template-columns:1fr}
- .ai-key-row button{width:100%}
 }
 
 </style>
@@ -151,10 +88,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 
 <div class="buttons">
 <button id="start">START CAMERA</button>
-<div class="rec-grid">
 <button id="rec">REC</button>
-<button id="aiRec">REC AI</button>
-</div>
 <button id="stop" disabled>STOP</button>
 </div>
 
@@ -168,32 +102,10 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 </div>
 
 
-<div class="voice-box">
-  <div class="block-title">ГОЛОС ДЛЯ ОБЫЧНОЙ ЗАПИСИ</div>
-  <button id="voiceFxToggle" type="button">ГОЛОС ВЕДУЩЕГО ДЛЯ REC: OFF</button>
-  <div class="small-note">Чистая студийная обработка: голос плотнее и яснее, без робота, металла и пугающего понижения.</div>
-</div>
-
-<div class="teleprompter-editor" id="teleprompterEditor">
-  <div class="block-title">ТЕЛЕСУФЛЁР</div>
-  <textarea id="teleprompterInput" placeholder="Вставь сюда текст для телесуфлёра."></textarea>
-  <button id="teleprompterDelete" type="button">УДАЛИТЬ ТЕКСТ</button>
-</div>
-
-<div class="teleprompter-reader hidden" id="teleprompterReader">
-  <div class="teleprompter-scroll" id="teleprompterScroll">
-    <div class="teleprompter-text" id="teleprompterText"></div>
-  </div>
-</div>
-
-<div class="ai-box">
-  <div class="block-title">ИИ-ОЗВУЧКА</div>
-  <div id="aiKeyState" class="ai-key-state hidden"></div>
-  <div class="ai-key-row">
-    <input id="aiApiKey" type="password" placeholder="OpenAI API key: sk-..." autocomplete="off">
-    <button id="aiSaveKey" type="button">СОХРАНИТЬ</button>
-  </div>
-  <div class="small-note">REC AI озвучивает текст из телесуфлёра молодым энергичным голосом и записывает готовое видео.</div>
+<div class="voice-style-box">
+  <div class="voice-style-title">ГОЛОС АГЕНТА Z</div>
+  <button id="voiceStyleToggle" type="button">ОБРАБОТКА ГОЛОСА: OFF</button>
+  <div class="voice-style-note">Характерный роботизированный голос: молодой энергичный ведущий, электронная окраска, короткий цифровой дубль и телевизионная компрессия. Без сильного понижения тона.</div>
 </div>
 
 <label>SIZE
@@ -238,7 +150,6 @@ const video=document.querySelector("#camera");
 const el={
  start:document.querySelector("#start"),
  rec:document.querySelector("#rec"),
- aiRec:document.querySelector("#aiRec"),
  stop:document.querySelector("#stop"),
  downloadZip:document.querySelector("#downloadZip"),
  warn:document.querySelector("#warn"),
@@ -250,23 +161,13 @@ const el={
  move:document.querySelector("#move"),
  smooth:document.querySelector("#smooth"),
  showCam:document.querySelector("#showCam"),
- voiceFxToggle:document.querySelector("#voiceFxToggle"),
- teleprompterEditor:document.querySelector("#teleprompterEditor"),
- teleprompterReader:document.querySelector("#teleprompterReader"),
- teleprompterInput:document.querySelector("#teleprompterInput"),
- teleprompterDelete:document.querySelector("#teleprompterDelete"),
- teleprompterScroll:document.querySelector("#teleprompterScroll"),
- teleprompterText:document.querySelector("#teleprompterText"),
- aiApiKey:document.querySelector("#aiApiKey"),
- aiSaveKey:document.querySelector("#aiSaveKey"),
- aiKeyState:document.querySelector("#aiKeyState"),
+ voiceStyleToggle:document.querySelector("#voiceStyleToggle"),
  
 };
 
 let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null;
 let recorderAudioDestination=null,voiceDryGain=null,voiceFxGain=null,voiceMasterGain=null;
-let voiceFxEnabled=false,aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false;
-let aiMotionTime=0,aiMouthUntil=0;
+let voiceStyleEnabled=false;
 let recorder=null, chunks=[], lastVideoTime=-1;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
@@ -384,261 +285,182 @@ async function initFace(){
 }
 
 
-function setVoiceFxEnabled(enabled){
- voiceFxEnabled=!!enabled;
- localStorage.setItem("danyapezVoiceFx",voiceFxEnabled?"1":"0");
- if(voiceDryGain&&voiceFxGain&&audioCtx){
-  const now=audioCtx.currentTime;
-  voiceDryGain.gain.setTargetAtTime(voiceFxEnabled?0:1,now,.025);
-  voiceFxGain.gain.setTargetAtTime(voiceFxEnabled?1:0,now,.025);
+function makeTapeCurve(amount=7){
+ const n=32768;
+ const curve=new Float32Array(n);
+ for(let i=0;i<n;i++){
+  const x=i*2/n-1;
+  curve[i]=Math.tanh(x*amount)/Math.tanh(amount);
  }
- el.voiceFxToggle.classList.toggle("active",voiceFxEnabled);
- el.voiceFxToggle.textContent=voiceFxEnabled
-  ?"ГОЛОС ВЕДУЩЕГО ДЛЯ REC: ON"
-  :"ГОЛОС ВЕДУЩЕГО ДЛЯ REC: OFF";
+ return curve;
 }
 
-function buildVoiceGraph(source){
+function setVoiceStyle(enabled){
+ voiceStyleEnabled=!!enabled;
+ localStorage.setItem("danyapezVoiceStyle",voiceStyleEnabled?"1":"0");
+
+ if(voiceDryGain&&voiceFxGain&&audioCtx){
+  const now=audioCtx.currentTime;
+  voiceDryGain.gain.cancelScheduledValues(now);
+  voiceFxGain.gain.cancelScheduledValues(now);
+  voiceDryGain.gain.setTargetAtTime(voiceStyleEnabled?0:1,now,.02);
+  voiceFxGain.gain.setTargetAtTime(voiceStyleEnabled?1:0,now,.02);
+ }
+
+ el.voiceStyleToggle.classList.toggle("active",voiceStyleEnabled);
+ el.voiceStyleToggle.textContent=voiceStyleEnabled
+  ?"ОБРАБОТКА ГОЛОСА: ON"
+  :"ОБРАБОТКА ГОЛОСА: OFF";
+}
+
+function buildVoiceProcessing(source){
  recorderAudioDestination=audioCtx.createMediaStreamDestination();
+
  analyser=audioCtx.createAnalyser();
  analyser.fftSize=512;
  audioData=new Uint8Array(analyser.frequencyBinCount);
 
  voiceMasterGain=audioCtx.createGain();
- voiceMasterGain.gain.value=.96;
+ voiceMasterGain.gain.value=.92;
+
  voiceDryGain=audioCtx.createGain();
  voiceFxGain=audioCtx.createGain();
 
+ // OFF: clean microphone.
  const dryHP=audioCtx.createBiquadFilter();
- dryHP.type="highpass";dryHP.frequency.value=70;
+ dryHP.type="highpass";
+ dryHP.frequency.value=68;
+ dryHP.Q.value=.7;
 
+ // ON: Agent-Z inspired robotized television voice.
  const hp=audioCtx.createBiquadFilter();
- hp.type="highpass";hp.frequency.value=80;
+ hp.type="highpass";
+ hp.frequency.value=92;
+ hp.Q.value=.75;
 
- const mud=audioCtx.createBiquadFilter();
- mud.type="peaking";mud.frequency.value=300;mud.Q.value=1;mud.gain.value=-2.3;
+ const lowCut=audioCtx.createBiquadFilter();
+ lowCut.type="peaking";
+ lowCut.frequency.value=280;
+ lowCut.Q.value=1.1;
+ lowCut.gain.value=-3.2;
+
+ const nasal=audioCtx.createBiquadFilter();
+ nasal.type="peaking";
+ nasal.frequency.value=1080;
+ nasal.Q.value=1.15;
+ nasal.gain.value=4.6;
 
  const presence=audioCtx.createBiquadFilter();
- presence.type="peaking";presence.frequency.value=2300;presence.Q.value=.85;presence.gain.value=3.2;
+ presence.type="peaking";
+ presence.frequency.value=2650;
+ presence.Q.value=.9;
+ presence.gain.value=3.8;
 
- const air=audioCtx.createBiquadFilter();
- air.type="highshelf";air.frequency.value=6200;air.gain.value=2;
+ const topCut=audioCtx.createBiquadFilter();
+ topCut.type="lowpass";
+ topCut.frequency.value=5900;
+ topCut.Q.value=.72;
 
- const comp=audioCtx.createDynamicsCompressor();
- comp.threshold.value=-24;comp.knee.value=14;comp.ratio.value=3.6;comp.attack.value=.006;comp.release.value=.14;
+ const compressor=audioCtx.createDynamicsCompressor();
+ compressor.threshold.value=-27;
+ compressor.knee.value=10;
+ compressor.ratio.value=5.2;
+ compressor.attack.value=.003;
+ compressor.release.value=.11;
+
+ const saturation=audioCtx.createWaveShaper();
+ saturation.curve=makeTapeCurve(2.8);
+ saturation.oversample="4x";
+
+ // Main electronic amplitude modulation.
+ // 36 Hz gives a clearly robotic texture without turning into a low horror voice.
+ const robotGain=audioCtx.createGain();
+ robotGain.gain.value=.82;
+
+ const robotOsc=audioCtx.createOscillator();
+ robotOsc.type="sine";
+ robotOsc.frequency.value=36;
+
+ const robotDepth=audioCtx.createGain();
+ robotDepth.gain.value=.16;
+
+ robotOsc.connect(robotDepth);
+ robotDepth.connect(robotGain.gain);
+ robotOsc.start();
+
+ // Short digital double / comb effect.
+ const shortDelay=audioCtx.createDelay(.05);
+ shortDelay.delayTime.value=.012;
+
+ const delayLfo=audioCtx.createOscillator();
+ delayLfo.type="triangle";
+ delayLfo.frequency.value=4.8;
+
+ const delayDepth=audioCtx.createGain();
+ delayDepth.gain.value=.0018;
+
+ delayLfo.connect(delayDepth);
+ delayDepth.connect(shortDelay.delayTime);
+ delayLfo.start();
+
+ const directFx=audioCtx.createGain();
+ directFx.gain.value=.84;
+
+ const doubleFx=audioCtx.createGain();
+ doubleFx.gain.value=.28;
+
+ // Tiny metallic echo, intentionally short.
+ const echo=audioCtx.createDelay(.15);
+ echo.delayTime.value=.058;
+
+ const echoFilter=audioCtx.createBiquadFilter();
+ echoFilter.type="bandpass";
+ echoFilter.frequency.value=1850;
+ echoFilter.Q.value=.8;
+
+ const echoGain=audioCtx.createGain();
+ echoGain.gain.value=.105;
 
  const limiter=audioCtx.createDynamicsCompressor();
- limiter.threshold.value=-5;limiter.knee.value=1.5;limiter.ratio.value=12;limiter.attack.value=.001;limiter.release.value=.08;
+ limiter.threshold.value=-4.5;
+ limiter.knee.value=1.2;
+ limiter.ratio.value=16;
+ limiter.attack.value=.001;
+ limiter.release.value=.07;
 
- const makeup=audioCtx.createGain();
- makeup.gain.value=1.1;
+ source.connect(dryHP);
+ dryHP.connect(voiceDryGain);
 
- source.connect(dryHP);dryHP.connect(voiceDryGain);
- source.connect(hp);hp.connect(mud);mud.connect(presence);presence.connect(air);air.connect(comp);comp.connect(makeup);makeup.connect(limiter);limiter.connect(voiceFxGain);
+ source.connect(hp);
+ hp.connect(lowCut);
+ lowCut.connect(nasal);
+ nasal.connect(presence);
+ presence.connect(topCut);
+ topCut.connect(compressor);
+ compressor.connect(saturation);
+ saturation.connect(robotGain);
+
+ robotGain.connect(directFx);
+ directFx.connect(limiter);
+
+ robotGain.connect(shortDelay);
+ shortDelay.connect(doubleFx);
+ doubleFx.connect(limiter);
+
+ robotGain.connect(echo);
+ echo.connect(echoFilter);
+ echoFilter.connect(echoGain);
+ echoGain.connect(limiter);
+
+ limiter.connect(voiceFxGain);
 
  voiceDryGain.connect(voiceMasterGain);
  voiceFxGain.connect(voiceMasterGain);
+
  voiceMasterGain.connect(analyser);
  voiceMasterGain.connect(recorderAudioDestination);
 
- setVoiceFxEnabled(voiceFxEnabled);
-}
-
-function saveTeleprompter(){
- localStorage.setItem("danyapezTeleprompterText",el.teleprompterInput.value);
-}
-function startTeleprompter(){
- saveTeleprompter();
- el.teleprompterText.textContent=el.teleprompterInput.value.trim()||"Текст для телесуфлёра не добавлен.";
- el.teleprompterScroll.scrollTop=0;
- el.teleprompterEditor.classList.add("hidden");
- el.teleprompterReader.classList.remove("hidden");
-}
-function stopTeleprompter(){
- el.teleprompterReader.classList.add("hidden");
- el.teleprompterEditor.classList.remove("hidden");
-}
-function deleteTeleprompter(){
- el.teleprompterInput.value="";
- el.teleprompterText.textContent="";
- localStorage.removeItem("danyapezTeleprompterText");
- setStatus("TEXT DELETED");
-}
-
-function showAIKeyState(){
- const key=localStorage.getItem("danyapezAIApiKey")||"";
- if(!key){
-  el.aiKeyState.classList.add("hidden");
-  el.aiKeyState.textContent="";
-  return;
- }
- el.aiKeyState.classList.remove("hidden");
- el.aiKeyState.textContent="✓ API-КЛЮЧ СОХРАНЁН: ••••••"+key.slice(-6);
-}
-function saveAIKey(){
- const key=el.aiApiKey.value.trim();
- if(!key){warn("ВСТАВЬ OPENAI API KEY.");return}
- localStorage.setItem("danyapezAIApiKey",key);
- showAIKeyState();
- hideWarn();
- setStatus("AI KEY SAVED");
-}
-
-function russianError(message){
- const t=String(message||"");
- const l=t.toLowerCase();
- if(l.includes("billing")||l.includes("quota")||l.includes("insufficient_quota"))return"НА OPENAI API НЕТ БАЛАНСА ИЛИ ДОСТИГНУТ ЛИМИТ.";
- if(l.includes("api key")||l.includes("authentication")||l.includes("unauthorized"))return"НЕВЕРНЫЙ OPENAI API KEY.";
- if(l.includes("rate limit"))return"СЛИШКОМ МНОГО ЗАПРОСОВ. ПОПРОБУЙ ПОЗЖЕ.";
- if(l.includes("failed to fetch")||l.includes("network"))return"ОШИБКА СЕТИ.";
- return t||"НЕИЗВЕСТНАЯ ОШИБКА.";
-}
-
-async function createTTS(text,key){
- const response=await fetch("https://api.openai.com/v1/audio/speech",{
-  method:"POST",
-  headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},
-  body:JSON.stringify({
-   model:"gpt-4o-mini-tts",
-   voice:"ash",
-   input:text,
-   instructions:"Speak in Russian as a young energetic male host of a late-1990s or early-2000s gaming television show. Natural human voice, about 24 to 30 years old, lively, upbeat, charismatic and friendly. Speak quickly but clearly, with confident rhythm, a slight smile in the voice, crisp consonants and expressive emphasis. No deep ominous bass, no robotic effect, no anonymous-witness voice, no whispering, no horror tone, and do not imitate any real person.",
-   response_format:"wav"
-  })
- });
- if(!response.ok){
-  const raw=await response.text();
-  let msg=raw;
-  try{msg=JSON.parse(raw)?.error?.message||raw}catch(_){}
-  throw new Error(russianError(msg));
- }
- return response.arrayBuffer();
-}
-
-function connectAIVoice(source){
- aiRecordingDestination=audioCtx.createMediaStreamDestination();
- analyser=audioCtx.createAnalyser();
- analyser.fftSize=512;
- audioData=new Uint8Array(analyser.frequencyBinCount);
-
- const hp=audioCtx.createBiquadFilter();
- hp.type="highpass";hp.frequency.value=75;
- const mud=audioCtx.createBiquadFilter();
- mud.type="peaking";mud.frequency.value=300;mud.Q.value=1;mud.gain.value=-1.8;
- const presence=audioCtx.createBiquadFilter();
- presence.type="peaking";presence.frequency.value=2450;presence.Q.value=.9;presence.gain.value=2.8;
- const air=audioCtx.createBiquadFilter();
- air.type="highshelf";air.frequency.value=6500;air.gain.value=1.7;
- const comp=audioCtx.createDynamicsCompressor();
- comp.threshold.value=-23;comp.knee.value=13;comp.ratio.value=3.4;comp.attack.value=.005;comp.release.value=.13;
- const limiter=audioCtx.createDynamicsCompressor();
- limiter.threshold.value=-4.5;limiter.knee.value=1.2;limiter.ratio.value=14;limiter.attack.value=.001;limiter.release.value=.07;
- const gain=audioCtx.createGain();gain.gain.value=.94;
-
- source.connect(hp);hp.connect(mud);mud.connect(presence);presence.connect(air);air.connect(comp);comp.connect(limiter);limiter.connect(gain);
- gain.connect(analyser);
- gain.connect(aiRecordingDestination);
- gain.connect(audioCtx.destination);
-}
-
-function startRecorderWithAudio(audioTracks,tag){
- resizeRec();
- const mime=mp4Mime();
- if(!mime)throw new Error("MP4 RECORDING IS NOT SUPPORTED IN THIS BROWSER.");
-
- chunks=[];
- el.downloadZip.classList.add("hidden");
- const settings=exportSettings();
- const videoStream=recCanvas.captureStream(30);
- const mixedStream=new MediaStream([...videoStream.getVideoTracks(),...audioTracks]);
-
- recorder=new MediaRecorder(mixedStream,{
-  mimeType:mime,
-  videoBitsPerSecond:settings.br,
-  audioBitsPerSecond:192000
- });
-
- recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
- recorder.onstop=()=>{
-  stopTeleprompter();
-  const blob=new Blob(chunks,{type:mime});
-  const stamp=new Date().toISOString().replace(/[:.]/g,"-");
-  el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${tag}_${stamp}.mp4`;
-  el.downloadZip.classList.remove("hidden");
-  setTimeout(()=>el.downloadZip.click(),120);
-
-  aiMode=false;
-  aiStopRequested=false;
-  stopTeleprompter();
-  stable="static";current="static";head.x=0;head.y=0;
-  el.rec.disabled=false;el.aiRec.disabled=false;el.stop.disabled=true;
-  el.aiRec.classList.remove("active");
-  setStatus("READY");
- };
- recorder.start(1000);
- el.rec.disabled=true;el.aiRec.disabled=true;el.stop.disabled=false;
-}
-
-async function startAIRecording(){
- hideWarn();
- const text=el.teleprompterInput.value.trim();
- const key=(el.aiApiKey.value.trim()||localStorage.getItem("danyapezAIApiKey")||"").trim();
-
- if(!text)throw new Error("ВСТАВЬ ТЕКСТ В ТЕЛЕСУФЛЁР.");
- if(text.length>4096)throw new Error("ТЕКСТ СЛИШКОМ ДЛИННЫЙ. МАКСИМУМ 4096 СИМВОЛОВ.");
- if(!key)throw new Error("ВСТАВЬ OPENAI API KEY.");
-
- localStorage.setItem("danyapezAIApiKey",key);
- showAIKeyState();
- el.aiRec.disabled=true;el.rec.disabled=true;el.aiRec.classList.add("active");
- setStatus("AI VOICE GENERATION");
-
- if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
- await audioCtx.resume();
-
- const wav=await createTTS(text,key);
- const buffer=await audioCtx.decodeAudioData(wav.slice(0));
- aiAudioSource=audioCtx.createBufferSource();
- aiAudioSource.buffer=buffer;
- connectAIVoice(aiAudioSource);
-
- aiMode=true;aiStopRequested=false;aiMotionTime=0;aiMouthUntil=0;
- startTeleprompter();
- startRecorderWithAudio(aiRecordingDestination.stream.getAudioTracks(),"AI_1920x1080");
- setStatus("REC AI");
-
- aiAudioSource.onended=()=>{
-  if(recorder&&recorder.state!=="inactive"&&!aiStopRequested){
-   setTimeout(()=>{if(recorder&&recorder.state!=="inactive")recorder.stop()},350);
-  }
- };
- setTimeout(()=>aiAudioSource.start(),180);
-}
-
-function updateAIMotion(){
- const now=performance.now();
- const v=volume();
-
- if(now>aiMotionTime){
-  aiMotionTime=now+180+Math.random()*420;
-  head.x=(Math.random()-.5)*70;
-  head.y=(Math.random()-.5)*32;
-  if(Math.random()<.16){
-   stable=Math.random()<.55?"brows":"surprised";
-   aiMouthUntil=now+90;
-  }
- }
- if(now>aiMouthUntil){
-  if(v>.018){
-   stable=Math.random()<.8?"open_mouth":(Math.random()<.55?"brows":"static");
-   aiMouthUntil=now+55+Math.random()*100;
-  }else{
-   stable="static";
-   aiMouthUntil=now+90;
-  }
- }
- current=stable;
+ setVoiceStyle(voiceStyleEnabled);
 }
 
 async function initCamera(){
@@ -666,7 +488,7 @@ async function initCamera(){
 
  if(micStream.getAudioTracks().length){
   const source=audioCtx.createMediaStreamSource(micStream);
-  buildVoiceGraph(source);
+  buildVoiceProcessing(source);
  }
 
  cameraReady=true;
@@ -737,9 +559,7 @@ function encodeWav(buffers,sampleRate){
 }
 
 function loop(){
- if(aiMode){
-  updateAIMotion();
- }else if(cameraReady&&video.readyState>=2&&video.currentTime!==lastVideoTime&&face){
+ if(cameraReady&&video.readyState>=2&&video.currentTime!==lastVideoTime&&face){
   lastVideoTime=video.currentTime;
   const r=face.detectForVideo(video,performance.now());
   const v=volume();
@@ -797,54 +617,29 @@ function startRec(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
 
   el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_embedded_png_audio_try_${stamp}.mp4`;
+  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_agent_z_robot_voice_${stamp}.mp4`;
   el.downloadZip.classList.remove("hidden");
   setTimeout(()=>el.downloadZip.click(),120);
 
   el.rec.disabled=false;
-  el.aiRec.disabled=false;
   el.stop.disabled=true;
   setStatus("READY");
  };
 
  // Более крупные куски обычно стабильнее для монтажа, чем частая нарезка.
  recorder.start(1000);
- startTeleprompter();
 
  el.format.textContent="MP4";
  el.rec.disabled=true;
- el.aiRec.disabled=true;
  el.stop.disabled=false;
  setStatus("REC MP4");
 }
 
 
-el.teleprompterInput.value=localStorage.getItem("danyapezTeleprompterText")||"";
-el.teleprompterInput.addEventListener("input",saveTeleprompter);
-el.teleprompterDelete.onclick=deleteTeleprompter;
-
-let teleDrag=false,teleStartY=0,teleStartScroll=0;
-el.teleprompterScroll.addEventListener("pointerdown",e=>{
- teleDrag=true;
- teleStartY=e.clientY;
- teleStartScroll=el.teleprompterScroll.scrollTop;
- el.teleprompterScroll.setPointerCapture(e.pointerId);
-});
-el.teleprompterScroll.addEventListener("pointermove",e=>{
- if(!teleDrag)return;
- el.teleprompterScroll.scrollTop=teleStartScroll-(e.clientY-teleStartY);
-});
-el.teleprompterScroll.addEventListener("pointerup",()=>teleDrag=false);
-el.teleprompterScroll.addEventListener("pointercancel",()=>teleDrag=false);
-
-el.aiApiKey.value=localStorage.getItem("danyapezAIApiKey")||"";
-el.aiSaveKey.onclick=saveAIKey;
-showAIKeyState();
-
-voiceFxEnabled=localStorage.getItem("danyapezVoiceFx")==="1";
-setVoiceFxEnabled(voiceFxEnabled);
-el.voiceFxToggle.onclick=()=>{
- setVoiceFxEnabled(!voiceFxEnabled);
+voiceStyleEnabled=localStorage.getItem("danyapezVoiceStyle")==="1";
+setVoiceStyle(voiceStyleEnabled);
+el.voiceStyleToggle.onclick=()=>{
+ setVoiceStyle(!voiceStyleEnabled);
  if(audioCtx&&audioCtx.state==="suspended")audioCtx.resume();
 };
 
@@ -865,13 +660,8 @@ el.start.onclick=async()=>{
  }
 };
 
-el.rec.onclick=()=>{try{hideWarn();startRec()}catch(e){console.error(e);warn("REC ERROR: "+russianError(e.message));setStatus("REC ERROR")}};
-el.aiRec.onclick=async()=>{try{await startAIRecording()}catch(e){console.error(e);aiMode=false;el.aiRec.disabled=false;el.rec.disabled=false;el.aiRec.classList.remove("active");warn(russianError(e.message));setStatus("AI ERROR")}};
-el.stop.onclick=()=>{
- aiStopRequested=true;
- if(aiAudioSource){try{aiAudioSource.stop()}catch(_){}}
- if(recorder&&recorder.state!=="inactive")recorder.stop();
-};
+el.rec.onclick=()=>{try{startRec()}catch(e){console.error(e);warn("REC ERROR: "+e.message)}};
+el.stop.onclick=()=>{if(recorder&&recorder.state!=="inactive")recorder.stop()};
 
 el.showCam.onchange=()=>video.classList.toggle("visible",el.showCam.checked);
 
