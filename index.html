@@ -44,16 +44,6 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
  #camera{width:130px;right:10px;bottom:10px}
  h1{font-size:12px} button,a,select{font-size:7px;padding:12px 9px}
 }
-
-.teleprompter-box{border:1px solid rgba(255,255,255,.25);padding:12px;display:grid;gap:10px}
-.teleprompter-box textarea{width:100%;height:120px;background:#000;color:#fff;border:1px solid #fff;padding:10px;font-family:Arial,sans-serif;font-size:14px;resize:vertical}
-.teleprompter-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.teleprompter-screen{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);width:min(80%,700px);max-height:170px;overflow:hidden;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.35);padding:15px;text-align:center;font-family:Arial,sans-serif;font-size:28px;line-height:1.4;display:none}
-.teleprompter-screen.on{display:block}
-.ai-box{border:1px solid rgba(119,65,246,.8);padding:12px;display:grid;gap:8px}
-.ai-box input{background:#000;color:#fff;border:1px solid #fff;padding:12px}
-.ok{color:#62ff88;font-size:9px}
-@media(max-width:900px){.teleprompter-screen{font-size:18px;bottom:10px}}
 </style>
 </head>
 <body>
@@ -61,7 +51,6 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <section class="stage">
 <canvas id="preview" width="1920" height="1080"></canvas>
 <video id="camera" playsinline muted autoplay></video>
-<div id="teleScreen" class="teleprompter-screen"></div>
 </section>
 
 <aside class="panel">
@@ -79,24 +68,6 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <button id="start">START CAMERA</button>
 <button id="rec">REC</button>
 <button id="stop" disabled>STOP</button>
-</div>
-
-
-<div class="teleprompter-box">
-<p>TELEPROMPTER</p>
-<textarea id="teleText" placeholder="Текст для чтения..."></textarea>
-<div class="teleprompter-row">
-<button id="teleStart">START TEXT</button>
-<button id="telePause">PAUSE</button>
-</div>
-</div>
-
-<div class="ai-box">
-<p>AI VOICE</p>
-<input id="aiKey" type="password" placeholder="OpenAI API key">
-<button id="saveKey">SAVE KEY</button>
-<div id="keyState"></div>
-<button id="aiRec">REC AI</button>
 </div>
 
 <a id="downloadZip" class="hidden" download>DOWNLOAD MP4</a>
@@ -124,6 +95,21 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <input id="showCam" type="checkbox"><span>SHOW CAMERA</span>
 </label>
 
+
+<div id="teleprompter" style="display:none;position:absolute;top:70px;left:50%;transform:translateX(-50%);width:90%;max-width:900px;z-index:20;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.35);padding:16px;color:white;font-family:'Press Start 2P',monospace;font-size:14px;line-height:2;cursor:move;touch-action:none">
+<span id="teleText">Текст суфлёра</span>
+<button id="teleClose" style="margin-top:10px">X</button>
+</div>
+
+<div>
+<label>AI TEXT
+<textarea id="aiText" style="width:100%;height:90px;background:#000;color:#fff;border:1px solid #fff;padding:10px;font-family:Arial"></textarea>
+</label>
+<button id="saveAIText">SAVE AI TEXT</button>
+</div>
+
+<button id="recAI">REC AI</button>
+
 <div class="hidden">
   <span id="status">WAIT</span>
   <span id="sprite">STATIC</span>
@@ -148,18 +134,16 @@ const rctx=recCanvas.getContext("2d",{alpha:false});
 const video=document.querySelector("#camera");
 
 const el={
+ aiText:document.querySelector("#aiText"),
+ recAI:document.querySelector("#recAI"),
+ saveAIText:document.querySelector("#saveAIText"),
+ teleprompter:document.querySelector("#teleprompter"),
+ teleText:document.querySelector("#teleText"),
+ teleClose:document.querySelector("#teleClose"),
  start:document.querySelector("#start"),
  rec:document.querySelector("#rec"),
  stop:document.querySelector("#stop"),
  downloadZip:document.querySelector("#downloadZip"),
- teleText:document.querySelector("#teleText"),
- teleScreen:document.querySelector("#teleScreen"),
- teleStart:document.querySelector("#teleStart"),
- telePause:document.querySelector("#telePause"),
- aiKey:document.querySelector("#aiKey"),
- saveKey:document.querySelector("#saveKey"),
- keyState:document.querySelector("#keyState"),
- aiRec:document.querySelector("#aiRec"),
  warn:document.querySelector("#warn"),
  status:document.querySelector("#status"),
  sprite:document.querySelector("#sprite"),
@@ -176,9 +160,6 @@ let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=
 let recorder=null, chunks=[], lastVideoTime=-1;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
-let teleTimer=null;
-let telePos=0;
-let teleRun=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
 
 let wavSource=null, wavProcessor=null, wavSilentGain=null, wavBuffers=[], wavSampleRate=44100;
@@ -278,34 +259,6 @@ function render(ctx,w,h,bg){
  const y=Math.round(h/2-sh/2+smoothHead.y*f);
 
  ctx.drawImage(sp,x,y,sw,sh);
-}
-
-
-function updateTele(){
- if(!teleRun)return;
- const t=el.teleText.value;
- if(!t)return;
- telePos+=1;
- el.teleScreen.textContent=t.slice(telePos%t.length)+ " " + t.slice(0,telePos%t.length);
-}
-function startTele(){
- el.teleScreen.classList.add("on");
- teleRun=true;
- if(teleTimer)clearInterval(teleTimer);
- teleTimer=setInterval(updateTele,80);
-}
-function pauseTele(){teleRun=!teleRun}
-function saveKey(){
- const k=el.aiKey.value.trim();
- if(!k)return;
- localStorage.setItem("danya_openai_key",k);
- el.keyState.innerHTML='<span class="ok">✓ KEY SAVED</span>';
-}
-async function testAI(){
- const key=localStorage.getItem("danya_openai_key")||el.aiKey.value;
- if(!key){warn("ADD API KEY");return}
- setStatus("AI READY");
- el.keyState.innerHTML='<span class="ok">✓ AI CONNECTED</span>';
 }
 
 async function initFace(){
@@ -496,11 +449,35 @@ function startRec(){
 }
 
 
-el.teleStart.onclick=startTele;
-el.telePause.onclick=pauseTele;
-el.saveKey.onclick=saveKey;
-el.aiRec.onclick=testAI;
-el.aiKey.value=localStorage.getItem("danya_openai_key")||"";
+// Extra controls
+el.aiText.value=localStorage.getItem("danya_ai_text")||"";
+el.saveAIText.onclick=()=>{
+ localStorage.setItem("danya_ai_text",el.aiText.value);
+ setStatus("AI TEXT SAVED");
+};
+
+el.recAI.onclick=()=>{
+ if(!el.aiText.value.trim()){
+  warn("Вставь текст для AI");
+  return;
+ }
+ warn("AI голос подключается следующим шагом. Текст сохранён.");
+};
+
+let teleY=0,teleDrag=false,teleStart=0;
+el.teleClose.onclick=()=>el.teleprompter.style.display="none";
+el.teleprompter.onpointerdown=e=>{
+ teleDrag=true;teleStart=e.clientY-teleY;
+ el.teleprompter.setPointerCapture(e.pointerId);
+};
+el.teleprompter.onpointermove=e=>{
+ if(teleDrag){
+  teleY=e.clientY-teleStart;
+  el.teleprompter.style.transform=`translate(-50%,${teleY}px)`;
+ }
+};
+el.teleprompter.onpointerup=()=>teleDrag=false;
+
 
 el.start.onclick=async()=>{
  try{
