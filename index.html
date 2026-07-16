@@ -44,6 +44,70 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
  #camera{width:130px;right:10px;bottom:10px}
  h1{font-size:12px} button,a,select{font-size:7px;padding:12px 9px}
 }
+
+.teleprompter-editor,
+.teleprompter-reader{
+  border:1px solid rgba(255,255,255,.25);
+  padding:12px;
+  display:grid;
+  gap:10px;
+}
+.teleprompter-editor textarea{
+  width:100%;
+  min-height:120px;
+  resize:vertical;
+  border:1px solid rgba(255,255,255,.35);
+  background:#000;
+  color:#fff;
+  padding:12px;
+  font-family:Arial,sans-serif;
+  font-size:16px;
+  line-height:1.45;
+}
+.teleprompter-tools{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.teleprompter-reader{
+  position:relative;
+  height:240px;
+  overflow:hidden;
+  background:#000;
+}
+.teleprompter-scroll{
+  height:100%;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+  cursor:grab;
+  scrollbar-width:thin;
+}
+.teleprompter-scroll:active{cursor:grabbing}
+.teleprompter-text{
+  padding:95px 12px 160px;
+  white-space:pre-wrap;
+  font-family:Arial,sans-serif;
+  font-size:28px;
+  line-height:1.45;
+  text-align:center;
+}
+.teleprompter-guide{
+  position:absolute;
+  left:0;right:0;top:50%;
+  border-top:1px solid rgba(119,65,246,.9);
+  pointer-events:none;
+}
+.teleprompter-title{
+  font-size:8px;
+  color:#7741F6;
+  line-height:1.5;
+}
+@media(max-width:900px){
+  .teleprompter-reader{height:220px}
+  .teleprompter-text{font-size:24px;padding-top:90px}
+}
+
 </style>
 </head>
 <body>
@@ -59,7 +123,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <h1>@danyapez</h1>
 
 </div>
-<p>Виртуальный анимированный аватар, управляемый технологией захвата движений</p>
+<p>ÐÐ¸ÑÑÑÐ°Ð»ÑÐ½ÑÐ¹ Ð°Ð½Ð¸Ð¼Ð¸ÑÐ¾Ð²Ð°Ð½Ð½ÑÐ¹ Ð°Ð²Ð°ÑÐ°Ñ, ÑÐ¿ÑÐ°Ð²Ð»ÑÐµÐ¼ÑÐ¹ ÑÐµÑÐ½Ð¾Ð»Ð¾Ð³Ð¸ÐµÐ¹ Ð·Ð°ÑÐ²Ð°ÑÐ° Ð´Ð²Ð¸Ð¶ÐµÐ½Ð¸Ð¹</p>
 </div>
 
 <div id="warn" class="warn"></div>
@@ -77,6 +141,30 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <button data-s="open_mouth">MOUTH</button>
 <button data-s="brows">BROWS</button>
 <button data-s="surprised">WOW</button>
+</div>
+
+<div class="teleprompter-editor" id="teleprompterEditor">
+  <div class="teleprompter-title">Ð¢ÐÐÐÐ¡Ð£Ð¤ÐÐÐ  â Ð¢ÐÐÐ¡Ð¢ ÐÐÐ¯ Ð¡ÐÐÐÐ£Ð®Ð©ÐÐ ÐÐÐÐÐ¡Ð</div>
+  <textarea id="teleprompterInput" placeholder="ÐÑÑÐ°Ð²Ñ ÑÑÐ´Ð° ÑÐµÐºÑÑ Ð·Ð°ÑÐ°Ð½ÐµÐµ. ÐÑÐ¸ Ð½Ð°Ð¶Ð°ÑÐ¸Ð¸ REC Ð¾Ð½ Ð¿Ð¾ÑÐ²Ð¸ÑÑÑ Ð½Ð¸Ð¶Ðµ Ð¼ÐµÐ½Ñ."></textarea>
+  <div class="teleprompter-tools">
+    <label>Ð¡ÐÐÐ ÐÐ¡Ð¢Ð¬
+      <input id="teleprompterSpeed" type="range" min="0" max="120" step="1" value="28">
+    </label>
+    <label>Ð ÐÐÐÐÐ  Ð¢ÐÐÐ¡Ð¢Ð
+      <input id="teleprompterFont" type="range" min="18" max="52" step="1" value="28">
+    </label>
+  </div>
+</div>
+
+<div class="teleprompter-reader hidden" id="teleprompterReader">
+  <div class="teleprompter-guide"></div>
+  <div class="teleprompter-scroll" id="teleprompterScroll">
+    <div class="teleprompter-text" id="teleprompterText"></div>
+  </div>
+  <div class="teleprompter-tools">
+    <button id="teleprompterPause" type="button">PAUSE</button>
+    <button id="teleprompterTop" type="button">Ð ÐÐÐ§ÐÐÐ</button>
+  </div>
 </div>
 
 <label>SIZE
@@ -98,7 +186,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <div class="hidden">
   <span id="status">WAIT</span>
   <span id="sprite">STATIC</span>
-  <span id="exportInfo">1920×1080</span>
+  <span id="exportInfo">1920Ã1080</span>
   <span id="format">MP4</span>
 </div>
 
@@ -132,10 +220,19 @@ const el={
  move:document.querySelector("#move"),
  smooth:document.querySelector("#smooth"),
  showCam:document.querySelector("#showCam"),
+ teleprompterEditor:document.querySelector("#teleprompterEditor"),
+ teleprompterReader:document.querySelector("#teleprompterReader"),
+ teleprompterInput:document.querySelector("#teleprompterInput"),
+ teleprompterText:document.querySelector("#teleprompterText"),
+ teleprompterScroll:document.querySelector("#teleprompterScroll"),
+ teleprompterSpeed:document.querySelector("#teleprompterSpeed"),
+ teleprompterFont:document.querySelector("#teleprompterFont"),
+ teleprompterPause:document.querySelector("#teleprompterPause"),
+ teleprompterTop:document.querySelector("#teleprompterTop"),
  
 };
 
-let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null;
+let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null, recorderAudioDestination=null;
 let recorder=null, chunks=[], lastVideoTime=-1;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
@@ -148,7 +245,7 @@ function warn(t){el.warn.textContent=t;el.warn.classList.add("visible")}
 function hideWarn(){el.warn.classList.remove("visible")}
 
 function exportSettings(){
- return {w:1920,h:1080,br:12000000,label:"1920×1080"};
+ return {w:1920,h:1080,br:12000000,label:"1920Ã1080"};
 }
 
 function resizeRec(){
@@ -260,7 +357,7 @@ async function initCamera(){
 
  stream=await navigator.mediaDevices.getUserMedia({
   video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
-  audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:{ideal:44100},channelCount:{ideal:1}}
+  audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,sampleRate:{ideal:44100},channelCount:{ideal:2}}
  });
 
  video.srcObject=stream;
@@ -279,7 +376,12 @@ async function initCamera(){
   const source=audioCtx.createMediaStreamSource(micStream);
   analyser=audioCtx.createAnalyser();
   analyser.fftSize=512;
+
+  recorderAudioDestination=audioCtx.createMediaStreamDestination();
+
   source.connect(analyser);
+  source.connect(recorderAudioDestination);
+
   audioData=new Uint8Array(analyser.frequencyBinCount);
  }
 
@@ -369,6 +471,52 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
+
+function saveTeleprompter(){
+ localStorage.setItem("danyapezTeleprompterText",el.teleprompterInput.value);
+ localStorage.setItem("danyapezTeleprompterSpeed",el.teleprompterSpeed.value);
+ localStorage.setItem("danyapezTeleprompterFont",el.teleprompterFont.value);
+}
+
+function teleprompterTick(now){
+ if(!teleprompterRunning)return;
+ if(!teleprompterLast)teleprompterLast=now;
+ const dt=(now-teleprompterLast)/1000;
+ teleprompterLast=now;
+ const speed=Number(el.teleprompterSpeed.value);
+ el.teleprompterScroll.scrollTop+=speed*dt;
+ teleprompterFrame=requestAnimationFrame(teleprompterTick);
+}
+
+function startTeleprompter(){
+ saveTeleprompter();
+ el.teleprompterText.textContent=el.teleprompterInput.value.trim()||"Ð¢ÐµÐºÑÑ Ð´Ð»Ñ ÑÐµÐ»ÐµÑÑÑÐ»ÑÑÐ° Ð½Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½.";
+ el.teleprompterText.style.fontSize=el.teleprompterFont.value+"px";
+ el.teleprompterScroll.scrollTop=0;
+ el.teleprompterEditor.classList.add("hidden");
+ el.teleprompterReader.classList.remove("hidden");
+ teleprompterRunning=true;
+ teleprompterLast=0;
+ el.teleprompterPause.textContent="PAUSE";
+ cancelAnimationFrame(teleprompterFrame);
+ teleprompterFrame=requestAnimationFrame(teleprompterTick);
+}
+
+function stopTeleprompter(){
+ teleprompterRunning=false;
+ cancelAnimationFrame(teleprompterFrame);
+ el.teleprompterReader.classList.add("hidden");
+ el.teleprompterEditor.classList.remove("hidden");
+}
+
+function toggleTeleprompter(){
+ teleprompterRunning=!teleprompterRunning;
+ el.teleprompterPause.textContent=teleprompterRunning?"PAUSE":"PLAY";
+ teleprompterLast=0;
+ if(teleprompterRunning)teleprompterFrame=requestAnimationFrame(teleprompterTick);
+ else cancelAnimationFrame(teleprompterFrame);
+}
+
 function startRec(){
  resizeRec();
 
@@ -384,13 +532,15 @@ function startRec(){
 
  const settings=exportSettings();
  const videoStream=recCanvas.captureStream(30);
- const audioTracks=micStream ? micStream.getAudioTracks() : [];
+ const audioTracks = recorderAudioDestination
+  ? recorderAudioDestination.stream.getAudioTracks()
+  : (micStream ? micStream.getAudioTracks() : []);
 
  if(!audioTracks.length){
   warn("MICROPHONE TRACK NOT FOUND. VIDEO WILL BE RECORDED WITHOUT AUDIO.");
  }
 
- // Один поток: canvas-видео + микрофон. Так звук и видео стартуют вместе.
+ // ÐÐ´Ð¸Ð½ Ð¿Ð¾ÑÐ¾Ðº: canvas-Ð²Ð¸Ð´ÐµÐ¾ + Ð¼Ð¸ÐºÑÐ¾ÑÐ¾Ð½. Ð¢Ð°Ðº Ð·Ð²ÑÐº Ð¸ Ð²Ð¸Ð´ÐµÐ¾ ÑÑÐ°ÑÑÑÑÑ Ð²Ð¼ÐµÑÑÐµ.
  const mixedStream=new MediaStream([
   ...videoStream.getVideoTracks(),
   ...audioTracks
@@ -399,7 +549,7 @@ function startRec(){
  recorder=new MediaRecorder(mixedStream,{
   mimeType:mime,
   videoBitsPerSecond:settings.br,
-  audioBitsPerSecond:128000
+  audioBitsPerSecond:192000
  });
 
  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
@@ -409,7 +559,7 @@ function startRec(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
 
   el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_embedded_png_audio_try_${stamp}.mp4`;
+  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("Ã","x")}_stable_video_audio441_${stamp}.mp4`;
   el.downloadZip.classList.remove("hidden");
   setTimeout(()=>el.downloadZip.click(),120);
 
@@ -418,7 +568,7 @@ function startRec(){
   setStatus("READY");
  };
 
- // Более крупные куски обычно стабильнее для монтажа, чем частая нарезка.
+ // ÐÐ¾Ð»ÐµÐµ ÐºÑÑÐ¿Ð½ÑÐµ ÐºÑÑÐºÐ¸ Ð¾Ð±ÑÑÐ½Ð¾ ÑÑÐ°Ð±Ð¸Ð»ÑÐ½ÐµÐµ Ð´Ð»Ñ Ð¼Ð¾Ð½ÑÐ°Ð¶Ð°, ÑÐµÐ¼ ÑÐ°ÑÑÐ°Ñ Ð½Ð°ÑÐµÐ·ÐºÐ°.
  recorder.start(1000);
 
  el.format.textContent="MP4";
@@ -431,7 +581,40 @@ el.start.onclick=async()=>{
  try{
   el.start.disabled=true;
   hideWarn();
-  await loadSprites();
+  
+el.teleprompterInput.value=localStorage.getItem("danyapezTeleprompterText")||"";
+el.teleprompterSpeed.value=localStorage.getItem("danyapezTeleprompterSpeed")||"28";
+el.teleprompterFont.value=localStorage.getItem("danyapezTeleprompterFont")||"28";
+
+el.teleprompterInput.addEventListener("input",saveTeleprompter);
+el.teleprompterSpeed.addEventListener("input",saveTeleprompter);
+el.teleprompterFont.addEventListener("input",()=>{
+ saveTeleprompter();
+ el.teleprompterText.style.fontSize=el.teleprompterFont.value+"px";
+});
+el.teleprompterPause.onclick=toggleTeleprompter;
+el.teleprompterTop.onclick=()=>{
+ el.teleprompterScroll.scrollTop=0;
+ teleprompterLast=0;
+};
+
+// ÐÐ¾Ð¶Ð½Ð¾ Ð´Ð²Ð¸Ð³Ð°ÑÑ ÑÐµÐºÑÑ Ð¼ÑÑÑÑ/Ð¿Ð°Ð»ÑÑÐµÐ¼ Ð²ÑÑÑÐ½ÑÑ.
+let teleDrag=false,teleStartY=0,teleStartScroll=0;
+el.teleprompterScroll.addEventListener("pointerdown",e=>{
+ teleDrag=true;
+ teleStartY=e.clientY;
+ teleStartScroll=el.teleprompterScroll.scrollTop;
+ el.teleprompterScroll.setPointerCapture(e.pointerId);
+});
+el.teleprompterScroll.addEventListener("pointermove",e=>{
+ if(!teleDrag)return;
+ el.teleprompterScroll.scrollTop=teleStartScroll-(e.clientY-teleStartY);
+});
+el.teleprompterScroll.addEventListener("pointerup",()=>teleDrag=false);
+el.teleprompterScroll.addEventListener("pointercancel",()=>teleDrag=false);
+
+
+await loadSprites();
   await initFace();
   await initCamera();
   setStatus("CAMERA ON");
