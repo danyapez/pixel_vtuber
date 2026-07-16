@@ -169,9 +169,9 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 
 
 <div class="voice-box">
-  <div class="block-title">ГОЛОС АГЕНТА Z ДЛЯ REC</div>
+  <div class="block-title">РОБОТИЗИРОВАННЫЙ ГОЛОС ДЛЯ REC</div>
   <button id="voiceFxToggle" type="button">ГОЛОС ВЕДУЩЕГО ДЛЯ REC: OFF</button>
-  <div class="small-note">Роботизированная обработка в духе игрового ТВ 90-х: электронный тембр, цифровой дубль, узкая телевизионная середина и короткий металлический хвост.</div>
+  <div class="small-note">Роботизированная обработка игрового телеведущего: электронный тембр, цифровой дубль, телевизионная середина и короткий металлический хвост.</div>
 </div>
 
 <div class="teleprompter-editor" id="teleprompterEditor">
@@ -193,7 +193,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
     <input id="aiApiKey" type="password" placeholder="OpenAI API key: sk-..." autocomplete="off">
     <button id="aiSaveKey" type="button">СОХРАНИТЬ</button>
   </div>
-  <div class="small-note">REC AI озвучивает текст из телесуфлёра молодым энергичным голосом и записывает готовое видео.</div>
+  <div class="small-note">REC AI озвучивает текст живым молодым голосом: разговорно, эмоционально и с характером, сохраняя роботизированную окраску.</div>
 </div>
 
 <label>SIZE
@@ -384,6 +384,18 @@ async function initFace(){
 }
 
 
+
+function makeTapeCurve(amount=3){
+ const n=32768;
+ const curve=new Float32Array(n);
+ const norm=Math.tanh(amount)||1;
+ for(let i=0;i<n;i++){
+  const x=i*2/n-1;
+  curve[i]=Math.tanh(x*amount)/norm;
+ }
+ return curve;
+}
+
 function setVoiceFxEnabled(enabled){
  voiceFxEnabled=!!enabled;
  localStorage.setItem("danyapezVoiceFx",voiceFxEnabled?"1":"0");
@@ -394,8 +406,8 @@ function setVoiceFxEnabled(enabled){
  }
  el.voiceFxToggle.classList.toggle("active",voiceFxEnabled);
  el.voiceFxToggle.textContent=voiceFxEnabled
-  ?"ГОЛОС АГЕНТА Z ДЛЯ REC: ON"
-  :"ГОЛОС АГЕНТА Z ДЛЯ REC: OFF";
+  ?"РОБОТИЗИРОВАННЫЙ ГОЛОС ДЛЯ REC: ON"
+  :"РОБОТИЗИРОВАННЫЙ ГОЛОС ДЛЯ REC: OFF";
 }
 
 function buildVoiceGraph(source){
@@ -605,7 +617,7 @@ async function createTTS(text,key){
    model:"gpt-4o-mini-tts",
    voice:"ash",
    input:text,
-   instructions:"Speak in Russian as a young energetic male host of a late-1990s or early-2000s gaming television show. Natural human voice, about 24 to 30 years old, lively, upbeat, charismatic and friendly. Speak quickly but clearly, with confident rhythm, a slight smile in the voice, crisp consonants and expressive emphasis. No deep ominous bass, no robotic effect, no anonymous-witness voice, no whispering, no horror tone, and do not imitate any real person.",
+   instructions:"Speak in Russian like a lively young guy who genuinely loves games and is excited to tell a friend something interesting. Sound spontaneous, playful, curious and emotionally involved rather than like a trained announcer. Use natural conversational rhythm, small changes of pace, short informal pauses, occasional amused emphasis, a light smile, and expressive reactions. Some phrases may be quicker and others more relaxed. Keep pronunciation clear but never overly polished or ceremonial. Avoid the tone of advertising, news, corporate narration, audiobook narration, or a professional radio presenter. Keep the existing retro robotic electronic character audible, but let the human personality, enthusiasm and playful energy come through. No horror tone, no anonymous-witness effect, no deep ominous bass, and do not imitate any real person.",
    response_format:"wav"
   })
  });
@@ -625,23 +637,124 @@ function connectAIVoice(source){
  audioData=new Uint8Array(analyser.frequencyBinCount);
 
  const hp=audioCtx.createBiquadFilter();
- hp.type="highpass";hp.frequency.value=75;
- const mud=audioCtx.createBiquadFilter();
- mud.type="peaking";mud.frequency.value=300;mud.Q.value=1;mud.gain.value=-1.8;
- const presence=audioCtx.createBiquadFilter();
- presence.type="peaking";presence.frequency.value=2450;presence.Q.value=.9;presence.gain.value=2.8;
- const air=audioCtx.createBiquadFilter();
- air.type="highshelf";air.frequency.value=6500;air.gain.value=1.7;
- const comp=audioCtx.createDynamicsCompressor();
- comp.threshold.value=-23;comp.knee.value=13;comp.ratio.value=3.4;comp.attack.value=.005;comp.release.value=.13;
- const limiter=audioCtx.createDynamicsCompressor();
- limiter.threshold.value=-4.5;limiter.knee.value=1.2;limiter.ratio.value=14;limiter.attack.value=.001;limiter.release.value=.07;
- const gain=audioCtx.createGain();gain.gain.value=.94;
+ hp.type="highpass";
+ hp.frequency.value=96;
+ hp.Q.value=.78;
 
- source.connect(hp);hp.connect(mud);mud.connect(presence);presence.connect(air);air.connect(comp);comp.connect(limiter);limiter.connect(gain);
- gain.connect(analyser);
- gain.connect(aiRecordingDestination);
- gain.connect(audioCtx.destination);
+ const lowCut=audioCtx.createBiquadFilter();
+ lowCut.type="peaking";
+ lowCut.frequency.value=300;
+ lowCut.Q.value=1.15;
+ lowCut.gain.value=-3.8;
+
+ const formant1=audioCtx.createBiquadFilter();
+ formant1.type="peaking";
+ formant1.frequency.value=980;
+ formant1.Q.value=1.25;
+ formant1.gain.value=5.2;
+
+ const formant2=audioCtx.createBiquadFilter();
+ formant2.type="peaking";
+ formant2.frequency.value=2250;
+ formant2.Q.value=1.0;
+ formant2.gain.value=4.0;
+
+ const tvBand=audioCtx.createBiquadFilter();
+ tvBand.type="lowpass";
+ tvBand.frequency.value=5600;
+ tvBand.Q.value=.8;
+
+ const comp=audioCtx.createDynamicsCompressor();
+ comp.threshold.value=-28;
+ comp.knee.value=9;
+ comp.ratio.value=5.8;
+ comp.attack.value=.003;
+ comp.release.value=.10;
+
+ const saturator=audioCtx.createWaveShaper();
+ saturator.curve=makeTapeCurve(2.9);
+ saturator.oversample="4x";
+
+ const robotGain=audioCtx.createGain();
+ robotGain.gain.value=.72;
+
+ const robotOsc=audioCtx.createOscillator();
+ robotOsc.type="square";
+ robotOsc.frequency.value=40;
+
+ const robotDepth=audioCtx.createGain();
+ robotDepth.gain.value=.22;
+
+ robotOsc.connect(robotDepth);
+ robotDepth.connect(robotGain.gain);
+ robotOsc.start();
+
+ const shortDelay=audioCtx.createDelay(.06);
+ shortDelay.delayTime.value=.013;
+
+ const delayLfo=audioCtx.createOscillator();
+ delayLfo.type="triangle";
+ delayLfo.frequency.value=5.2;
+
+ const delayDepth=audioCtx.createGain();
+ delayDepth.gain.value=.0022;
+
+ delayLfo.connect(delayDepth);
+ delayDepth.connect(shortDelay.delayTime);
+ delayLfo.start();
+
+ const directGain=audioCtx.createGain();
+ directGain.gain.value=.80;
+
+ const doubleGain=audioCtx.createGain();
+ doubleGain.gain.value=.31;
+
+ const echo=audioCtx.createDelay(.15);
+ echo.delayTime.value=.059;
+
+ const echoBand=audioCtx.createBiquadFilter();
+ echoBand.type="bandpass";
+ echoBand.frequency.value=1800;
+ echoBand.Q.value=1.0;
+
+ const echoGain=audioCtx.createGain();
+ echoGain.gain.value=.12;
+
+ const limiter=audioCtx.createDynamicsCompressor();
+ limiter.threshold.value=-4.3;
+ limiter.knee.value=1;
+ limiter.ratio.value=18;
+ limiter.attack.value=.001;
+ limiter.release.value=.06;
+
+ const out=audioCtx.createGain();
+ out.gain.value=.94;
+
+ source.connect(hp);
+ hp.connect(lowCut);
+ lowCut.connect(formant1);
+ formant1.connect(formant2);
+ formant2.connect(tvBand);
+ tvBand.connect(comp);
+ comp.connect(saturator);
+ saturator.connect(robotGain);
+
+ robotGain.connect(directGain);
+ directGain.connect(limiter);
+
+ robotGain.connect(shortDelay);
+ shortDelay.connect(doubleGain);
+ doubleGain.connect(limiter);
+
+ robotGain.connect(echo);
+ echo.connect(echoBand);
+ echoBand.connect(echoGain);
+ echoGain.connect(limiter);
+
+ limiter.connect(out);
+ out.connect(analyser);
+ out.connect(aiRecordingDestination);
+ out.connect(audioCtx.destination);
 }
 
 function startRecorderWithAudio(audioTracks,tag){
