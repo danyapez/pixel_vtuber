@@ -44,8 +44,8 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 .small-note{color:#777;font:11px/1.45 Arial,sans-serif}
 .teleprompter-editor textarea{width:100%;min-height:120px;resize:vertical;border:1px solid rgba(255,255,255,.35);background:#000;color:#fff;padding:12px;font:16px/1.5 Arial,sans-serif}
 .teleprompter-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.rec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-#aiRec.active,#aiRecEn.active{background:#7741F6;border-color:#7741F6}
+.rec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+#aiRec.active{background:#7741F6;border-color:#7741F6}
 .teleprompter-reader{position:sticky;top:8px;z-index:5;height:245px;overflow:hidden;background:#000;border-color:#7741F6;box-shadow:0 8px 30px rgba(0,0,0,.85)}
 .teleprompter-reader.speaking{border-color:#24c86a}
 .teleprompter-reader-head{display:flex;justify-content:space-between;gap:10px;color:#7741F6;font-size:7px;line-height:1.5}
@@ -88,7 +88,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 
 <div class="teleprompter-editor" id="teleprompterEditor">
 <div class="block-title">ТЕЛЕСУФЛЁР</div>
-<textarea id="teleprompterInput" placeholder="Вставьте текст и нажмите REC RU или REC EN."></textarea>
+<textarea id="teleprompterInput" placeholder="Вставьте текст и нажмите REC RU."></textarea>
 <button id="teleprompterDelete" type="button">ВСТАВИТЬ ТЕКСТ</button>
 </div>
 
@@ -103,7 +103,6 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <div class="rec-grid">
 <button id="rec">REC</button>
 <button id="aiRec">REC RU</button>
-<button id="aiRecEn">REC EN</button>
 </div>
 <button id="stop" disabled>STOP</button>
 </div>
@@ -160,7 +159,6 @@ const el={
  start:document.querySelector("#start"),
  rec:document.querySelector("#rec"),
  aiRec:document.querySelector("#aiRec"),
- aiRecEn:document.querySelector("#aiRecEn"),
  stop:document.querySelector("#stop"),
  downloadZip:document.querySelector("#downloadZip"),
  warn:document.querySelector("#warn"),
@@ -188,9 +186,9 @@ const el={
 let sprites={}, face=null, stream=null, micStream=null, audioCtx=null, analyser=null, audioData=null;
 let micAnalyser=null,micAudioData=null;
 let recorderAudioDestination=null,voiceDryGain=null,voiceFxGain=null,pitchNode=null;
-let voiceFxEnabled=true,pitchWorkletReady=false;
+let voiceFxEnabled=true,pitchWorkletContexts=new WeakSet();
 let teleprompterActive=false,teleprompterSpeakingUntil=0,teleprompterLastFrame=0,teleprompterManualUntil=0;
-let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0,aiActiveButton=null,aiGraphCleanup=null;
+let aiMode=false,aiAudioCtx=null,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0,aiActiveButton=null,aiGraphCleanup=null;
 let stopInProgress=false;
 let recorder=null, chunks=[], lastVideoTime=-1;
 let mediaBunnyPromise=null;
@@ -355,9 +353,9 @@ function setVoiceDepth(value){
  if(pitchNode)pitchNode.port.postMessage({semitones});
 }
 
-async function createPitchNode(){
- if(!audioCtx.audioWorklet||!window.AudioWorkletNode)return null;
- if(!pitchWorkletReady){
+async function createPitchNode(ctx=audioCtx){
+ if(!ctx?.audioWorklet||!window.AudioWorkletNode)return null;
+ if(!pitchWorkletContexts.has(ctx)){
   const workletCode=`
 class AgentZPitchProcessor extends AudioWorkletProcessor{
  constructor(){
@@ -394,75 +392,76 @@ class AgentZPitchProcessor extends AudioWorkletProcessor{
 }
 registerProcessor("agent-z-pitch",AgentZPitchProcessor);`;
   const url=URL.createObjectURL(new Blob([workletCode],{type:"application/javascript"}));
-  try{await audioCtx.audioWorklet.addModule(url);pitchWorkletReady=true}
+  try{await ctx.audioWorklet.addModule(url);pitchWorkletContexts.add(ctx)}
   catch(error){console.warn("Pitch worklet unavailable",error);return null}
   finally{URL.revokeObjectURL(url)}
  }
- const node=new AudioWorkletNode(audioCtx,"agent-z-pitch",{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:1});
+ const node=new AudioWorkletNode(ctx,"agent-z-pitch",{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:1});
  node.port.postMessage({semitones:Number(el.voiceDepth.value)});
  return node;
 }
 
-async function connectAgentZPreset(source,output,semitones=1.17,rememberPitch=false){
- const hp=audioCtx.createBiquadFilter();hp.type="highpass";hp.frequency.value=90;hp.Q.value=.7;
- const lp=audioCtx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=8500;lp.Q.value=.7;
- const lowCut=audioCtx.createBiquadFilter();lowCut.type="peaking";lowCut.frequency.value=210;lowCut.Q.value=.82;lowCut.gain.value=-7.2;
- const mid=audioCtx.createBiquadFilter();mid.type="peaking";mid.frequency.value=650;mid.Q.value=.9;mid.gain.value=6.8;
- const clarity=audioCtx.createBiquadFilter();clarity.type="peaking";clarity.frequency.value=1800;clarity.Q.value=.82;clarity.gain.value=2.3;
- const edge=audioCtx.createBiquadFilter();edge.type="peaking";edge.frequency.value=4200;edge.Q.value=.9;edge.gain.value=5.5;
- const compressor=audioCtx.createDynamicsCompressor();compressor.threshold.value=-18;compressor.knee.value=8;compressor.ratio.value=2.25;compressor.attack.value=.005;compressor.release.value=.078;
- const grit=audioCtx.createWaveShaper();grit.curve=makeDriveCurve(1.15);grit.oversample="4x";
- const sum=audioCtx.createGain();
+async function connectAgentZPreset(source,output,semitones=1.17,rememberPitch=false,ctx=audioCtx){
+ const hp=ctx.createBiquadFilter();hp.type="highpass";hp.frequency.value=90;hp.Q.value=.7;
+ const lp=ctx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=8500;lp.Q.value=.7;
+ const lowCut=ctx.createBiquadFilter();lowCut.type="peaking";lowCut.frequency.value=210;lowCut.Q.value=.82;lowCut.gain.value=-7.2;
+ const mid=ctx.createBiquadFilter();mid.type="peaking";mid.frequency.value=650;mid.Q.value=.9;mid.gain.value=6.8;
+ const clarity=ctx.createBiquadFilter();clarity.type="peaking";clarity.frequency.value=1800;clarity.Q.value=.82;clarity.gain.value=2.3;
+ const edge=ctx.createBiquadFilter();edge.type="peaking";edge.frequency.value=4200;edge.Q.value=.9;edge.gain.value=5.5;
+ const compressor=ctx.createDynamicsCompressor();compressor.threshold.value=-18;compressor.knee.value=8;compressor.ratio.value=2.25;compressor.attack.value=.005;compressor.release.value=.078;
+ const grit=ctx.createWaveShaper();grit.curve=makeDriveCurve(1.15);grit.oversample="4x";
+ const sum=ctx.createGain();
 
  source.connect(hp);hp.connect(lp);lp.connect(lowCut);lowCut.connect(mid);mid.connect(clarity);clarity.connect(edge);edge.connect(compressor);compressor.connect(grit);
 
- const mainGain=audioCtx.createGain();mainGain.gain.value=1;
+ const mainGain=ctx.createGain();mainGain.gain.value=1;
  grit.connect(mainGain);mainGain.connect(sum);
 
- const delay1HP=audioCtx.createBiquadFilter();delay1HP.type="highpass";delay1HP.frequency.value=250;
- const delay1LP=audioCtx.createBiquadFilter();delay1LP.type="lowpass";delay1LP.frequency.value=6200;
- const delay1=audioCtx.createDelay(.2);delay1.delayTime.value=.046;
- const delay1Gain=audioCtx.createGain();delay1Gain.gain.value=.32;
+ const delay1HP=ctx.createBiquadFilter();delay1HP.type="highpass";delay1HP.frequency.value=250;
+ const delay1LP=ctx.createBiquadFilter();delay1LP.type="lowpass";delay1LP.frequency.value=6200;
+ const delay1=ctx.createDelay(.2);delay1.delayTime.value=.046;
+ const delay1Gain=ctx.createGain();delay1Gain.gain.value=.32;
  grit.connect(delay1HP);delay1HP.connect(delay1LP);delay1LP.connect(delay1);delay1.connect(delay1Gain);delay1Gain.connect(sum);
 
- const delay2HP=audioCtx.createBiquadFilter();delay2HP.type="highpass";delay2HP.frequency.value=350;
- const delay2LP=audioCtx.createBiquadFilter();delay2LP.type="lowpass";delay2LP.frequency.value=5000;
- const delay2=audioCtx.createDelay(.2);delay2.delayTime.value=.092;
- const delay2Gain=audioCtx.createGain();delay2Gain.gain.value=.08;
+ const delay2HP=ctx.createBiquadFilter();delay2HP.type="highpass";delay2HP.frequency.value=350;
+ const delay2LP=ctx.createBiquadFilter();delay2LP.type="lowpass";delay2LP.frequency.value=5000;
+ const delay2=ctx.createDelay(.2);delay2.delayTime.value=.092;
+ const delay2Gain=ctx.createGain();delay2Gain.gain.value=.08;
  grit.connect(delay2HP);delay2HP.connect(delay2LP);delay2LP.connect(delay2);delay2.connect(delay2Gain);delay2Gain.connect(sum);
 
- const harmonicPitch=await createPitchNode();
+ const harmonicPitch=await createPitchNode(ctx);
  if(harmonicPitch){
   harmonicPitch.port.postMessage({semitones});
   if(rememberPitch)pitchNode=harmonicPitch;
-  const pitchHP=audioCtx.createBiquadFilter();pitchHP.type="highpass";pitchHP.frequency.value=180;
-  const pitchLP=audioCtx.createBiquadFilter();pitchLP.type="lowpass";pitchLP.frequency.value=7600;
-  const pitchDelay=audioCtx.createDelay(.04);pitchDelay.delayTime.value=.007;
-  const pitchGain=audioCtx.createGain();pitchGain.gain.value=.36;
+  const pitchHP=ctx.createBiquadFilter();pitchHP.type="highpass";pitchHP.frequency.value=180;
+  const pitchLP=ctx.createBiquadFilter();pitchLP.type="lowpass";pitchLP.frequency.value=7600;
+  const pitchDelay=ctx.createDelay(.04);pitchDelay.delayTime.value=.007;
+  const pitchGain=ctx.createGain();pitchGain.gain.value=.44;
   grit.connect(harmonicPitch);harmonicPitch.connect(pitchHP);pitchHP.connect(pitchLP);pitchLP.connect(pitchDelay);pitchDelay.connect(pitchGain);pitchGain.connect(sum);
  }else{
-  const chorusDelay=audioCtx.createDelay(.04);chorusDelay.delayTime.value=.007;
-  const chorusGain=audioCtx.createGain();chorusGain.gain.value=.28;
+  const chorusDelay=ctx.createDelay(.04);chorusDelay.delayTime.value=.007;
+  const chorusGain=ctx.createGain();chorusGain.gain.value=.28;
   grit.connect(chorusDelay);chorusDelay.connect(chorusGain);chorusGain.connect(sum);
  }
 
- const robotHP=audioCtx.createBiquadFilter();robotHP.type="highpass";robotHP.frequency.value=850;
- const robotLP=audioCtx.createBiquadFilter();robotLP.type="lowpass";robotLP.frequency.value=5600;
- const phaserDelay=audioCtx.createDelay(.01);phaserDelay.delayTime.value=.0029;
- const phaserLfo=audioCtx.createOscillator(),phaserDepth=audioCtx.createGain();
+ // ROBOT X2: широкий цифровой дубль, как в agent-z-reference-robot-x2.mp3.
+ const robotHP=ctx.createBiquadFilter();robotHP.type="highpass";robotHP.frequency.value=240;
+ const robotLP=ctx.createBiquadFilter();robotLP.type="lowpass";robotLP.frequency.value=6200;
+ const phaserDelay=ctx.createDelay(.01);phaserDelay.delayTime.value=.0029;
+ const phaserLfo=ctx.createOscillator(),phaserDepth=ctx.createGain();
  phaserLfo.type="sine";phaserLfo.frequency.value=.82;phaserDepth.gain.value=.0012;
  phaserLfo.connect(phaserDepth);phaserDepth.connect(phaserDelay.delayTime);phaserLfo.start();
- const robotAmp=audioCtx.createGain();robotAmp.gain.value=.65;
- const robotOsc=audioCtx.createOscillator(),robotDepth=audioCtx.createGain();
- robotOsc.type="sine";robotOsc.frequency.value=39;robotDepth.gain.value=.35;
+ const robotAmp=ctx.createGain();robotAmp.gain.value=.58;
+ const robotOsc=ctx.createOscillator(),robotDepth=ctx.createGain();
+ robotOsc.type="sine";robotOsc.frequency.value=39;robotDepth.gain.value=.42;
  robotOsc.connect(robotDepth);robotDepth.connect(robotAmp.gain);robotOsc.start();
- const robotDrive=audioCtx.createWaveShaper();robotDrive.curve=makeDriveCurve(2.2);robotDrive.oversample="2x";
- const robotCrush=audioCtx.createWaveShaper();robotCrush.curve=makeBitcrushCurve(10.5);robotCrush.oversample="none";
- const robotGain=audioCtx.createGain();robotGain.gain.value=.36;
+ const robotDrive=ctx.createWaveShaper();robotDrive.curve=makeDriveCurve(2.2);robotDrive.oversample="2x";
+ const robotCrush=ctx.createWaveShaper();robotCrush.curve=makeBitcrushCurve(10.5);robotCrush.oversample="none";
+ const robotGain=ctx.createGain();robotGain.gain.value=.62;
  grit.connect(robotHP);robotHP.connect(robotLP);robotLP.connect(phaserDelay);phaserDelay.connect(robotAmp);robotAmp.connect(robotDrive);robotDrive.connect(robotCrush);robotCrush.connect(robotGain);robotGain.connect(sum);
 
- const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-9.6;limiter.knee.value=1;limiter.ratio.value=20;limiter.attack.value=.002;limiter.release.value=.055;
- const master=audioCtx.createGain();master.gain.value=.4;
+ const limiter=ctx.createDynamicsCompressor();limiter.threshold.value=-9.6;limiter.knee.value=1;limiter.ratio.value=20;limiter.attack.value=.002;limiter.release.value=.055;
+ const master=ctx.createGain();master.gain.value=.4;
  sum.connect(limiter);limiter.connect(master);master.connect(output);
  return ()=>{
   try{source.disconnect(hp)}catch(_){}
@@ -489,7 +488,7 @@ async function buildVoiceGraph(source){
  setVoiceFxEnabled(voiceFxEnabled);setVoiceDepth(el.voiceDepth.value);
 }
 
-async function synthesizeText(text,language="ru"){
+async function synthesizeText(text,language="ru",decodeContext=audioCtx){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
  try{
   const submit=await fetch(`${TTS_API}/gradio_api/call/tts_interface`,{
@@ -515,37 +514,39 @@ async function synthesizeText(text,language="ru"){
   const audioResponse=await fetch(audioUrl,{signal:controller.signal});
   if(!audioResponse.ok)throw new Error("ОШИБКА ЗАГРУЗКИ ГОЛОСА: "+audioResponse.status);
   const bytes=await audioResponse.arrayBuffer();
-  return await audioCtx.decodeAudioData(bytes.slice(0));
+  return await decodeContext.decodeAudioData(bytes.slice(0));
  }catch(error){
   if(error?.name==="AbortError")throw new Error("ОЗВУЧКА НЕ УСПЕЛА ЗАГРУЗИТЬСЯ.");
   throw error;
  }finally{clearTimeout(timer)}
 }
 
-async function buildAIVoiceGraph(source){
+async function buildAIVoiceGraph(source,ctx){
  if(aiGraphCleanup){try{aiGraphCleanup()}catch(_){}aiGraphCleanup=null}
- aiRecordingDestination=audioCtx.createMediaStreamDestination();
- analyser=audioCtx.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=.7;
+ const destination=ctx.createMediaStreamDestination();
+ aiRecordingDestination=destination;
+ analyser=ctx.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=.7;
  audioData=new Uint8Array(analyser.frequencyBinCount);
- const master=audioCtx.createGain();master.gain.value=1;
- const cleanupPreset=await connectAgentZPreset(source,master,1.17,false);
- master.connect(analyser);master.connect(aiRecordingDestination);master.connect(audioCtx.destination);
+ const master=ctx.createGain();master.gain.value=1;
+ const cleanupPreset=await connectAgentZPreset(source,master,1.17,false,ctx);
+ master.connect(analyser);master.connect(destination);master.connect(ctx.destination);
  aiGraphCleanup=()=>{
   cleanupPreset();
   try{source.disconnect()}catch(_){}
   try{master.disconnect()}catch(_){}
   try{analyser.disconnect()}catch(_){}
-  try{aiRecordingDestination?.disconnect()}catch(_){}
+  try{destination.disconnect()}catch(_){}
  };
 }
 
 function finishAI(){
  if(aiAudioSource){aiAudioSource.onended=null;try{aiAudioSource.disconnect()}catch(_){}}
  if(aiGraphCleanup){try{aiGraphCleanup()}catch(_){}aiGraphCleanup=null}
+ const contextToClose=aiAudioCtx;aiAudioCtx=null;
+ if(contextToClose&&contextToClose.state!=="closed")contextToClose.close().catch(()=>{});
  aiMode=false;aiStopRequested=false;aiAudioSource=null;aiRecordingDestination=null;
  analyser=micAnalyser;audioData=micAudioData;
  el.aiRec.classList.remove("active");el.aiRec.textContent="REC RU";
- el.aiRecEn.classList.remove("active");el.aiRecEn.textContent="REC EN";
  aiActiveButton=null;
 }
 
@@ -555,14 +556,18 @@ async function startAIRecording(language="ru"){
  if(text.length>6000)throw new Error("СЛИШКОМ ДЛИННЫЙ ТЕКСТ. МАКСИМУМ 6000 СИМВОЛОВ.");
  if(recorder&&recorder.state!=="inactive")throw new Error("ЗАПИСЬ УЖЕ ИДЁТ.");
 
- aiActiveButton=language==="en"?el.aiRecEn:el.aiRec;
- hideWarn();el.aiRec.disabled=true;el.aiRecEn.disabled=true;el.rec.disabled=true;aiActiveButton.classList.add("active");aiActiveButton.textContent="ЗАГРУЗКА";setStatus("ЗАГРУЗКА");
- if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000})}catch(_){audioCtx=new (window.AudioContext||window.webkitAudioContext)()}}
- await audioCtx.resume();
+ aiActiveButton=el.aiRec;
+ hideWarn();el.aiRec.disabled=true;el.rec.disabled=true;aiActiveButton.classList.add("active");aiActiveButton.textContent="ЗАГРУЗКА";setStatus("ЗАГРУЗКА");
+ if(aiAudioCtx&&aiAudioCtx.state!=="closed"){try{await aiAudioCtx.close()}catch(_){}}
+ try{aiAudioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000})}catch(_){aiAudioCtx=new (window.AudioContext||window.webkitAudioContext)()}
+ await aiAudioCtx.resume();
+ // Короткий пустой буфер разблокирует новую аудиосессию на iPhone до долгой загрузки TTS.
+ const unlock=aiAudioCtx.createBufferSource();unlock.buffer=aiAudioCtx.createBuffer(1,1,aiAudioCtx.sampleRate);unlock.connect(aiAudioCtx.destination);unlock.start();
 
- const buffer=await synthesizeText(text,language);
- aiAudioSource=audioCtx.createBufferSource();aiAudioSource.buffer=buffer;
- await buildAIVoiceGraph(aiAudioSource);
+ const buffer=await synthesizeText(text,language,aiAudioCtx);
+ if(aiAudioCtx.state==="suspended")await aiAudioCtx.resume();
+ aiAudioSource=aiAudioCtx.createBufferSource();aiAudioSource.buffer=buffer;
+ await buildAIVoiceGraph(aiAudioSource,aiAudioCtx);
 
  aiMode=true;aiStopRequested=false;aiMotionTime=0;aiMouthUntil=0;
  const languageTag=language==="en"?"EN":"RU";
@@ -573,7 +578,7 @@ async function startAIRecording(language="ru"){
  aiAudioSource.onended=()=>{
   if(recorder&&recorder.state!=="inactive"&&!aiStopRequested)setTimeout(()=>stopRecording(false),350);
  };
- aiAudioSource.start(audioCtx.currentTime+.18);
+ aiAudioSource.start(aiAudioCtx.currentTime+.18);
 }
 
 function updateAIMotion(now,vol){
@@ -758,7 +763,7 @@ function loop(){
 
 function setRecordingUi(active){
  el.format.textContent="MP4";
- el.rec.disabled=active;el.aiRec.disabled=active;el.aiRecEn.disabled=active;el.stop.disabled=!active;
+ el.rec.disabled=active;el.aiRec.disabled=active;el.stop.disabled=!active;
  if(active&&el.teleprompterInput.value.trim())openTeleprompter(true);
 }
 
@@ -771,7 +776,7 @@ function finishRecordingBlob(blob,tag,settings){
  el.downloadZip.classList.remove("hidden");
  setTimeout(()=>el.downloadZip.click(),120);
  setRecordingUi(false);
- stopInProgress=false;
+ stopInProgress=false;recorder=null;
  if(aiMode)finishAI();
  setStatus("READY");
 }
@@ -845,7 +850,7 @@ async function startPreciseRec(mediaBunny,audioTracks,tag,settings){
    precise.state="inactive";
    finishRecordingBlob(new Blob([bufferTarget.buffer],{type:"video/mp4"}),tag,settings);
   }catch(error){
-   precise.state="inactive";stopInProgress=false;console.error(error);setRecordingUi(false);
+   precise.state="inactive";stopInProgress=false;recorder=null;console.error(error);setRecordingUi(false);
    if(aiMode)finishAI();warn("ОШИБКА ЭКСПОРТА CAPCUT: "+String(error.message||error));setStatus("EXPORT ERROR");
   }
  }};
@@ -917,7 +922,6 @@ async function runAIRecording(language){
  catch(e){console.error(e);finishAI();setRecordingUi(false);warn(String(e.message||e));setStatus("AI ERROR")}
 }
 el.aiRec.onclick=()=>runAIRecording("ru");
-el.aiRecEn.onclick=()=>runAIRecording("en");
 async function stopRecording(manual=true){
  if(stopInProgress)return;
  if(!recorder||recorder.state==="inactive"){
