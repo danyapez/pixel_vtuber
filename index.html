@@ -187,6 +187,7 @@ let voiceFxEnabled=true,pitchWorkletReady=false;
 let teleprompterActive=false,teleprompterSpeakingUntil=0,teleprompterLastFrame=0,teleprompterManualUntil=0;
 let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0;
 let recorder=null, chunks=[], lastVideoTime=-1;
+let mediaBunnyPromise=null;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
@@ -216,6 +217,21 @@ function mp4Mime(){
   "video/mp4"
  ];
  return types.find(t=>MediaRecorder.isTypeSupported(t))||"";
+}
+
+async function loadMediaBunny(){
+ if(!window.VideoEncoder)return null;
+ if(!mediaBunnyPromise){
+  mediaBunnyPromise=(async()=>{
+   const mediaBunny=await import("https://cdn.jsdelivr.net/npm/mediabunny@1.50.8/+esm");
+   if(!(await mediaBunny.canEncodeAudio("aac"))){
+    const {registerAacEncoder}=await import("https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.50.8/+esm");
+    registerAacEncoder();
+   }
+   return mediaBunny;
+  })().catch(error=>{console.warn("Precise MP4 exporter unavailable",error);mediaBunnyPromise=null;return null});
+ }
+ return mediaBunnyPromise;
 }
 
 function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
@@ -522,7 +538,7 @@ async function startAIRecording(){
  await buildAIVoiceGraph(aiAudioSource);
 
  aiMode=true;aiStopRequested=false;aiMotionTime=0;aiMouthUntil=0;
- const started=startRec(aiRecordingDestination.stream.getAudioTracks(),"AI_AGENT_Z");
+ const started=await startRec(aiRecordingDestination.stream.getAudioTracks(),"AI_AGENT_Z");
  if(!started){finishAI();throw new Error("ЗАПИСЬ MP4 НЕ ПОДДЕРЖИВАЕТСЯ.")}
  el.aiRec.classList.add("active");el.aiRec.textContent="REC AI";setStatus("REC AI");
 
@@ -697,68 +713,117 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
-function startRec(audioTracksOverride=null,tag="AGENT_Z"){
- resizeRec();
-
- const mime=mp4Mime();
- if(!mime){
-  warn("MP4 RECORDING IS NOT SUPPORTED IN THIS BROWSER. OPEN IN CHROME/EDGE DESKTOP OR SAFARI.");
-  setStatus("NO MP4");
-  return false;
- }
-
- chunks=[];
- el.downloadZip.classList.add("hidden");
-
- const settings=exportSettings();
- const videoStream=recCanvas.captureStream(30);
- const audioTracks=audioTracksOverride||(recorderAudioDestination?recorderAudioDestination.stream.getAudioTracks():(micStream?micStream.getAudioTracks():[]));
-
- if(!audioTracks.length){
-  warn("MICROPHONE TRACK NOT FOUND. VIDEO WILL BE RECORDED WITHOUT AUDIO.");
- }
-
- // Один поток: canvas-видео + микрофон. Так звук и видео стартуют вместе.
- const mixedStream=new MediaStream([
-  ...videoStream.getVideoTracks(),
-  ...audioTracks
- ]);
-
- recorder=new MediaRecorder(mixedStream,{
-  mimeType:mime,
-  videoBitsPerSecond:settings.br,
-  audioBitsPerSecond:192000
- });
-
- recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-
- recorder.onstop=()=>{
-  closeTeleprompter();
-  const blob=new Blob(chunks,{type:mime});
-  const stamp=new Date().toISOString().replace(/[:.]/g,"-");
-
-  el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${tag}_${settings.label.replace("×","x")}_${stamp}.mp4`;
-  el.downloadZip.classList.remove("hidden");
-  setTimeout(()=>el.downloadZip.click(),120);
-
-  el.rec.disabled=false;
-  el.aiRec.disabled=false;
-  el.stop.disabled=true;
-  if(aiMode)finishAI();
-  setStatus("READY");
- };
-
- // Один цельный фрагмент даёт CapCut стабильные таймкоды без секундных стыков.
- recorder.start();
- if(el.teleprompterInput.value.trim())openTeleprompter(true);
-
+function setRecordingUi(active){
  el.format.textContent="MP4";
- el.rec.disabled=true;
- el.aiRec.disabled=true;
- el.stop.disabled=false;
- setStatus("REC MP4");
+ el.rec.disabled=active;el.aiRec.disabled=active;el.stop.disabled=!active;
+ if(active&&el.teleprompterInput.value.trim())openTeleprompter(true);
+}
+
+function finishRecordingBlob(blob,tag,settings){
+ closeTeleprompter();
+ const stamp=new Date().toISOString().replace(/[:.]/g,"-");
+ if(el.downloadZip.href.startsWith("blob:"))URL.revokeObjectURL(el.downloadZip.href);
+ el.downloadZip.href=URL.createObjectURL(blob);
+ el.downloadZip.download=`danyapez_avatar_${tag}_${settings.label.replace("×","x")}_${stamp}.mp4`;
+ el.downloadZip.classList.remove("hidden");
+ setTimeout(()=>el.downloadZip.click(),120);
+ setRecordingUi(false);
+ if(aiMode)finishAI();
+ setStatus("READY");
+}
+
+function startLegacyRec(audioTracks,tag,settings){
+ const mime=mp4Mime();
+ if(!mime)return false;
+ chunks=[];
+ const videoStream=recCanvas.captureStream(30);
+ const clonedAudio=audioTracks.map(track=>track.clone());
+ const mixedStream=new MediaStream([...videoStream.getVideoTracks(),...clonedAudio]);
+ const legacy=new MediaRecorder(mixedStream,{mimeType:mime,videoBitsPerSecond:settings.br,audioBitsPerSecond:192000});
+ recorder=legacy;
+ legacy.ondataavailable=event=>{if(event.data&&event.data.size)chunks.push(event.data)};
+ legacy.onstop=()=>{
+  mixedStream.getTracks().forEach(track=>track.stop());
+  finishRecordingBlob(new Blob(chunks,{type:mime}),tag,settings);
+ };
+ legacy.start();
+ setRecordingUi(true);setStatus("REC MP4");
  return true;
+}
+
+async function startPreciseRec(mediaBunny,audioTracks,tag,settings){
+ const {Output,Mp4OutputFormat,BufferTarget,CanvasSource,MediaStreamAudioTrackSource}=mediaBunny;
+ const bufferTarget=new BufferTarget();
+ const output=new Output({format:new Mp4OutputFormat({fastStart:"in-memory"}),target:bufferTarget});
+ const videoSource=new CanvasSource(recCanvas,{codec:"avc",bitrate:settings.br});
+ output.addVideoTrack(videoSource,{frameRate:30});
+
+ let recordingAudioTrack=null,audioSource=null,recordingError=null;
+ if(audioTracks.length){
+  recordingAudioTrack=audioTracks[0].clone();
+  audioSource=new MediaStreamAudioTrackSource(recordingAudioTrack,{
+   codec:"aac",bitrate:192000,transform:{numberOfChannels:1,sampleRate:48000}
+  });
+  audioSource.errorPromise.catch(error=>{recordingError=error});
+  output.addAudioTrack(audioSource);
+ }
+
+ try{await output.start()}
+ catch(error){
+  if(recordingAudioTrack)recordingAudioTrack.stop();
+  try{await output.cancel()}catch(_){}
+  throw error;
+ }
+
+ const pendingFrames=new Set();
+ let frameCount=0,frameTimer=null;
+ const startedAt=performance.now();
+ const addFrame=()=>{
+  const index=frameCount++,timestamp=index/30;
+  const promise=Promise.resolve(videoSource.add(timestamp,1/30,{keyFrame:index%60===0})).catch(error=>{recordingError=error});
+  pendingFrames.add(promise);promise.then(()=>pendingFrames.delete(promise));
+ };
+ addFrame();frameTimer=setInterval(addFrame,1000/30);
+
+ const precise={state:"recording",kind:"capcut",stop:async()=>{
+  if(precise.state!=="recording")return;
+  precise.state="stopping";clearInterval(frameTimer);setStatus("СОХРАНЕНИЕ");
+  const elapsed=(performance.now()-startedAt)/1000;
+  if(recordingAudioTrack)recordingAudioTrack.stop();
+  // Два завершающих кадра перекрывают служебный хвост AAC, чтобы звук никогда не был длиннее видео в CapCut.
+  const requiredFrames=Math.max(frameCount,Math.ceil(elapsed*30)+2);
+  while(frameCount<requiredFrames)addFrame();
+  try{
+   await Promise.all([...pendingFrames]);
+   if(recordingError)throw recordingError;
+   await output.finalize();
+   if(!bufferTarget.buffer)throw new Error("MP4 BUFFER IS EMPTY");
+   precise.state="inactive";
+   finishRecordingBlob(new Blob([bufferTarget.buffer],{type:"video/mp4"}),tag,settings);
+  }catch(error){
+   precise.state="inactive";console.error(error);setRecordingUi(false);
+   if(aiMode)finishAI();warn("ОШИБКА ЭКСПОРТА CAPCUT: "+String(error.message||error));setStatus("EXPORT ERROR");
+  }
+ }};
+ recorder=precise;
+ setRecordingUi(true);setStatus("REC MP4");
+ return true;
+}
+
+async function startRec(audioTracksOverride=null,tag="AGENT_Z"){
+ resizeRec();el.downloadZip.classList.add("hidden");setStatus("ПОДГОТОВКА MP4");
+ const settings=exportSettings();
+ const audioTracks=audioTracksOverride||(recorderAudioDestination?recorderAudioDestination.stream.getAudioTracks():(micStream?micStream.getAudioTracks():[]));
+ if(!audioTracks.length)warn("MICROPHONE TRACK NOT FOUND. VIDEO WILL BE RECORDED WITHOUT AUDIO.");
+
+ const mediaBunny=await loadMediaBunny();
+ if(mediaBunny){
+  try{return await startPreciseRec(mediaBunny,audioTracks,tag,settings)}
+  catch(error){console.warn("Precise MP4 start failed; using MediaRecorder",error)}
+ }
+ const started=startLegacyRec(audioTracks,tag,settings);
+ if(!started){warn("MP4 RECORDING IS NOT SUPPORTED IN THIS BROWSER.");setStatus("NO MP4")}
+ return started;
 }
 
 el.teleprompterInput.value=localStorage.getItem("danyapezTeleprompterText")||"";
@@ -800,7 +865,7 @@ el.start.onclick=async()=>{
  }
 };
 
-el.rec.onclick=()=>{try{hideWarn();startRec()}catch(e){console.error(e);warn("REC ERROR: "+e.message)}};
+el.rec.onclick=async()=>{try{hideWarn();await startRec()}catch(e){console.error(e);setRecordingUi(false);warn("REC ERROR: "+e.message)}};
 el.aiRec.onclick=async()=>{
  try{await startAIRecording()}
  catch(e){console.error(e);finishAI();el.aiRec.disabled=false;el.rec.disabled=false;el.stop.disabled=true;warn(String(e.message||e));setStatus("AI ERROR")}
