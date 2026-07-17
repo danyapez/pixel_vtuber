@@ -144,7 +144,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <h1>@danyapez</h1>
 
 </div>
-<p>Виртуальный анимированный аватар, управляемый технологией захвата движений</p>
+<p>ÐÐ¸ÑÑÑÐ°Ð»ÑÐ½ÑÐ¹ Ð°Ð½Ð¸Ð¼Ð¸ÑÐ¾Ð²Ð°Ð½Ð½ÑÐ¹ Ð°Ð²Ð°ÑÐ°Ñ, ÑÐ¿ÑÐ°Ð²Ð»ÑÐµÐ¼ÑÐ¹ ÑÐµÑÐ½Ð¾Ð»Ð¾Ð³Ð¸ÐµÐ¹ Ð·Ð°ÑÐ²Ð°ÑÐ° Ð´Ð²Ð¸Ð¶ÐµÐ½Ð¸Ð¹</p>
 </div>
 
 <div id="warn" class="warn"></div>
@@ -169,15 +169,15 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 
 
 <div class="voice-box">
-  <div class="block-title">КИБЕРНЕТИЧЕСКИЙ ГОЛОС ДЛЯ REC</div>
-  <button id="voiceFxToggle" type="button">ГОЛОС ВЕДУЩЕГО ДЛЯ REC: OFF</button>
-  <div class="small-note">Обработка в духе игрового ТВ начала 2000-х: яркий цифровой тембр, короткий harmonizer-дубль, плотная компрессия и лёгкая кибернетическая окраска.</div>
+  <div class="block-title">ÐÐÐÐÐ ÐÐÐ¢ÐÐ§ÐÐ¡ÐÐÐ ÐÐÐÐÐ¡ ÐÐÐ¯ REC</div>
+  <button id="voiceFxToggle" type="button">ÐÐÐÐÐ¡ ÐÐÐÐ£Ð©ÐÐÐ ÐÐÐ¯ REC: OFF</button>
+  <div class="small-note">ÐÐ±ÑÐ°Ð±Ð¾ÑÐºÐ° Ð² Ð´ÑÑÐµ Ð¸Ð³ÑÐ¾Ð²Ð¾Ð³Ð¾ Ð¢Ð Ð½Ð°ÑÐ°Ð»Ð° 2000-Ñ: ÑÑÐºÐ¸Ð¹ ÑÐ¸ÑÑÐ¾Ð²Ð¾Ð¹ ÑÐµÐ¼Ð±Ñ, ÐºÐ¾ÑÐ¾ÑÐºÐ¸Ð¹ harmonizer-Ð´ÑÐ±Ð»Ñ, Ð¿Ð»Ð¾ÑÐ½Ð°Ñ ÐºÐ¾Ð¼Ð¿ÑÐµÑÑÐ¸Ñ Ð¸ Ð»ÑÐ³ÐºÐ°Ñ ÐºÐ¸Ð±ÐµÑÐ½ÐµÑÐ¸ÑÐµÑÐºÐ°Ñ Ð¾ÐºÑÐ°ÑÐºÐ°.</div>
 </div>
 
 <div class="teleprompter-editor" id="teleprompterEditor">
-  <div class="block-title">ТЕЛЕСУФЛЁР</div>
-  <textarea id="teleprompterInput" placeholder="Вставь сюда текст для телесуфлёра."></textarea>
-  <button id="teleprompterDelete" type="button">УДАЛИТЬ ТЕКСТ</button>
+  <div class="block-title">Ð¢ÐÐÐÐ¡Ð£Ð¤ÐÐÐ </div>
+  <textarea id="teleprompterInput" placeholder="ÐÑÑÐ°Ð²Ñ ÑÑÐ´Ð° ÑÐµÐºÑÑ Ð´Ð»Ñ ÑÐµÐ»ÐµÑÑÑÐ»ÑÑÐ°."></textarea>
+  <button id="teleprompterDelete" type="button">Ð£ÐÐÐÐÐ¢Ð¬ Ð¢ÐÐÐ¡Ð¢</button>
 </div>
 
 <div class="teleprompter-reader hidden" id="teleprompterReader">
@@ -187,13 +187,9 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 </div>
 
 <div class="ai-box">
-  <div class="block-title">ИИ-ОЗВУЧКА</div>
-  <div id="aiKeyState" class="ai-key-state hidden"></div>
-  <div class="ai-key-row">
-    <input id="aiApiKey" type="password" placeholder="OpenAI API key: sk-..." autocomplete="off">
-    <button id="aiSaveKey" type="button">СОХРАНИТЬ</button>
-  </div>
-  <div class="small-note">REC AI использует точно такую же цифровую обработку начала 2000-х, как обычный REC: harmonizer-дубль, detune, компрессия и лёгкая кибернетическая окраска.</div>
+  <div class="block-title">ÐÐ-ÐÐÐÐ£Ð§ÐÐ</div>
+  <div id="localVoiceState" class="ai-key-state">ÐÐÐÐÐÐ¬ÐÐ«Ð ÐÐÐÐÐÐ â¢ ÐÐÐ API-ÐÐÐ®Ð§Ð</div>
+  <div class="small-note">REC AI ÑÐ¾Ð·Ð´Ð°ÑÑ ÑÐµÑÑ Ð¿ÑÑÐ¼Ð¾ Ð² Ð±ÑÐ°ÑÐ·ÐµÑÐµ Ð¸ Ð¿ÑÐ¾Ð¿ÑÑÐºÐ°ÐµÑ ÐµÑ ÑÐµÑÐµÐ· ÑÑ Ð¶Ðµ Ð¾Ð±ÑÐ°Ð±Ð¾ÑÐºÑ Ð½Ð°ÑÐ°Ð»Ð° 2000-Ñ, ÑÑÐ¾ Ð¸ Ð¾Ð±ÑÑÐ½ÑÐ¹ REC: detune, harmonizer-Ð´ÑÐ±Ð»Ñ, ÐºÐ¾Ð¼Ð¿ÑÐµÑÑÐ¸Ñ Ð¸ ÑÐ¸ÑÑÐ¾Ð²Ð°Ñ Ð¾ÐºÑÐ°ÑÐºÐ°.</div>
 </div>
 
 <label>SIZE
@@ -215,7 +211,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <div class="hidden">
   <span id="status">WAIT</span>
   <span id="sprite">STATIC</span>
-  <span id="exportInfo">1920×1080</span>
+  <span id="exportInfo">1920Ã1080</span>
   <span id="format">MP4</span>
 </div>
 
@@ -257,9 +253,7 @@ const el={
  teleprompterDelete:document.querySelector("#teleprompterDelete"),
  teleprompterScroll:document.querySelector("#teleprompterScroll"),
  teleprompterText:document.querySelector("#teleprompterText"),
- aiApiKey:document.querySelector("#aiApiKey"),
- aiSaveKey:document.querySelector("#aiSaveKey"),
- aiKeyState:document.querySelector("#aiKeyState"),
+ localVoiceState:document.querySelector("#localVoiceState"),
  
 };
 
@@ -279,7 +273,7 @@ function warn(t){el.warn.textContent=t;el.warn.classList.add("visible")}
 function hideWarn(){el.warn.classList.remove("visible")}
 
 function exportSettings(){
- return {w:1920,h:1080,br:12000000,label:"1920×1080"};
+ return {w:1920,h:1080,br:12000000,label:"1920Ã1080"};
 }
 
 function resizeRec(){
@@ -406,8 +400,8 @@ function setVoiceFxEnabled(enabled){
  }
  el.voiceFxToggle.classList.toggle("active",voiceFxEnabled);
  el.voiceFxToggle.textContent=voiceFxEnabled
-  ?"КИБЕРНЕТИЧЕСКИЙ ГОЛОС ДЛЯ REC: ON"
-  :"КИБЕРНЕТИЧЕСКИЙ ГОЛОС ДЛЯ REC: OFF";
+  ?"ÐÐÐÐÐ ÐÐÐ¢ÐÐ§ÐÐ¡ÐÐÐ ÐÐÐÐÐ¡ ÐÐÐ¯ REC: ON"
+  :"ÐÐÐÐÐ ÐÐÐ¢ÐÐ§ÐÐ¡ÐÐÐ ÐÐÐÐÐ¡ ÐÐÐ¯ REC: OFF";
 }
 
 function buildVoiceGraph(source){
@@ -423,13 +417,13 @@ function buildVoiceGraph(source){
  voiceDryGain=audioCtx.createGain();
  voiceFxGain=audioCtx.createGain();
 
- // OFF: чистый микрофон.
+ // OFF: ÑÐ¸ÑÑÑÐ¹ Ð¼Ð¸ÐºÑÐ¾ÑÐ¾Ð½.
  const dryHP=audioCtx.createBiquadFilter();
  dryHP.type="highpass";
  dryHP.frequency.value=68;
  dryHP.Q.value=.7;
 
- // ON: человеческий голос + характерная ТВ-обработка 90-х.
+ // ON: ÑÐµÐ»Ð¾Ð²ÐµÑÐµÑÐºÐ¸Ð¹ Ð³Ð¾Ð»Ð¾Ñ + ÑÐ°ÑÐ°ÐºÑÐµÑÐ½Ð°Ñ Ð¢Ð-Ð¾Ð±ÑÐ°Ð±Ð¾ÑÐºÐ° 90-Ñ.
  const hp=audioCtx.createBiquadFilter();
  hp.type="highpass";
  hp.frequency.value=82;
@@ -475,11 +469,11 @@ function buildVoiceGraph(source){
  grit.curve=makeTapeCurve(1.75);
  grit.oversample="4x";
 
- // Основная дорожка.
+ // ÐÑÐ½Ð¾Ð²Ð½Ð°Ñ Ð´Ð¾ÑÐ¾Ð¶ÐºÐ°.
  const directGain=audioCtx.createGain();
  directGain.gain.value=.84;
 
- // Два коротких detune-дубля через модулируемые задержки.
+ // ÐÐ²Ð° ÐºÐ¾ÑÐ¾ÑÐºÐ¸Ñ detune-Ð´ÑÐ±Ð»Ñ ÑÐµÑÐµÐ· Ð¼Ð¾Ð´ÑÐ»Ð¸ÑÑÐµÐ¼ÑÐµ Ð·Ð°Ð´ÐµÑÐ¶ÐºÐ¸.
  const detuneA=audioCtx.createDelay(.06);
  detuneA.delayTime.value=.0085;
 
@@ -514,7 +508,7 @@ function buildVoiceGraph(source){
  const detuneGainB=audioCtx.createGain();
  detuneGainB.gain.value=.22;
 
- // Очень короткий flanger-хвост.
+ // ÐÑÐµÐ½Ñ ÐºÐ¾ÑÐ¾ÑÐºÐ¸Ð¹ flanger-ÑÐ²Ð¾ÑÑ.
  const flangeDelay=audioCtx.createDelay(.03);
  flangeDelay.delayTime.value=.0048;
 
@@ -582,7 +576,7 @@ function saveTeleprompter(){
 }
 function startTeleprompter(){
  saveTeleprompter();
- el.teleprompterText.textContent=el.teleprompterInput.value.trim()||"Текст для телесуфлёра не добавлен.";
+ el.teleprompterText.textContent=el.teleprompterInput.value.trim()||"Ð¢ÐµÐºÑÑ Ð´Ð»Ñ ÑÐµÐ»ÐµÑÑÑÐ»ÑÑÐ° Ð½Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½.";
  el.teleprompterScroll.scrollTop=0;
  el.teleprompterEditor.classList.add("hidden");
  el.teleprompterReader.classList.remove("hidden");
@@ -598,54 +592,95 @@ function deleteTeleprompter(){
  setStatus("TEXT DELETED");
 }
 
-function showAIKeyState(){
- const key=localStorage.getItem("danyapezAIApiKey")||"";
- if(!key){
-  el.aiKeyState.classList.add("hidden");
-  el.aiKeyState.textContent="";
-  return;
- }
- el.aiKeyState.classList.remove("hidden");
- el.aiKeyState.textContent="✓ API-КЛЮЧ СОХРАНЁН: ••••••"+key.slice(-6);
-}
-function saveAIKey(){
- const key=el.aiApiKey.value.trim();
- if(!key){warn("ВСТАВЬ OPENAI API KEY.");return}
- localStorage.setItem("danyapezAIApiKey",key);
- showAIKeyState();
- hideWarn();
- setStatus("AI KEY SAVED");
-}
+let localTTSReady=false;
+let localTTSPromise=null;
 
 function russianError(message){
  const t=String(message||"");
  const l=t.toLowerCase();
- if(l.includes("billing")||l.includes("quota")||l.includes("insufficient_quota"))return"НА OPENAI API НЕТ БАЛАНСА ИЛИ ДОСТИГНУТ ЛИМИТ.";
- if(l.includes("api key")||l.includes("authentication")||l.includes("unauthorized"))return"НЕВЕРНЫЙ OPENAI API KEY.";
- if(l.includes("rate limit"))return"СЛИШКОМ МНОГО ЗАПРОСОВ. ПОПРОБУЙ ПОЗЖЕ.";
- if(l.includes("failed to fetch")||l.includes("network"))return"ОШИБКА СЕТИ.";
- return t||"НЕИЗВЕСТНАЯ ОШИБКА.";
+ if(l.includes("network")||l.includes("failed to fetch")||l.includes("load"))return"ÐÐ Ð£ÐÐÐÐÐ¡Ð¬ ÐÐÐÐ Ð£ÐÐÐ¢Ð¬ ÐÐÐÐÐÐ¬ÐÐ«Ð ÐÐÐÐÐÐ ÐÐÐÐÐ¡Ð. ÐÐ ÐÐÐÐ Ð¬ ÐÐÐ¢ÐÐ ÐÐÐ¢ Ð ÐÐÐ ÐÐÐÐÐ Ð£ÐÐ Ð¡Ð¢Ð ÐÐÐÐ¦Ð£.";
+ return t||"ÐÐÐÐÐÐÐ¡Ð¢ÐÐÐ¯ ÐÐ¨ÐÐÐÐ.";
 }
 
-async function createTTS(text,key){
- const response=await fetch("https://api.openai.com/v1/audio/speech",{
-  method:"POST",
-  headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},
-  body:JSON.stringify({
-   model:"gpt-4o-mini-tts",
-   voice:"ash",
-   input:text,
-   instructions:"Speak in Russian like a lively young gaming-show host from the early 2000s. Sound energetic, playful, slightly sarcastic and conversational, not like a formal announcer. Use quick reactions, expressive emphasis, a light grin in the voice and natural changes of pace. Keep the voice bright, digital and futuristic in character, while remaining clearly human and understandable. No horror tone, no anonymous-witness effect, no deep ominous bass, and do not imitate any real person.",
-   response_format:"wav"
-  })
+function loadExternalScript(url){
+ return new Promise((resolve,reject)=>{
+  const existing=[...document.scripts].find(s=>s.src===url);
+  if(existing&&window.meSpeak){resolve();return}
+  const script=document.createElement("script");
+  script.src=url;
+  script.async=true;
+  script.onload=()=>resolve();
+  script.onerror=()=>reject(new Error("LOCAL TTS SCRIPT LOAD ERROR"));
+  document.head.appendChild(script);
  });
- if(!response.ok){
-  const raw=await response.text();
-  let msg=raw;
-  try{msg=JSON.parse(raw)?.error?.message||raw}catch(_){}
-  throw new Error(russianError(msg));
- }
- return response.arrayBuffer();
+}
+
+function loadMeSpeakConfig(url){
+ return new Promise((resolve,reject)=>{
+  window.meSpeak.loadConfig(url,(ok,info)=>{
+   if(ok)resolve(info);
+   else reject(new Error("LOCAL TTS CONFIG LOAD ERROR: "+String(info||"")));
+  });
+ });
+}
+
+function loadMeSpeakVoice(url){
+ return new Promise((resolve,reject)=>{
+  window.meSpeak.loadVoice(url,(ok,info)=>{
+   if(ok)resolve(info);
+   else reject(new Error("LOCAL TTS VOICE LOAD ERROR: "+String(info||"")));
+  });
+ });
+}
+
+async function ensureLocalTTS(){
+ if(localTTSReady&&window.meSpeak)return;
+ if(localTTSPromise)return localTTSPromise;
+
+ localTTSPromise=(async()=>{
+  el.localVoiceState.textContent="ÐÐÐÐ Ð£ÐÐÐ ÐÐÐÐÐÐ¬ÐÐÐÐ ÐÐÐÐÐ¡Ðâ¦";
+  el.localVoiceState.classList.remove("hidden");
+
+  const base="https://www.masswerk.at/mespeak/";
+  await loadExternalScript(base+"mespeak.js");
+
+  if(!window.meSpeak)throw new Error("LOCAL TTS ENGINE NOT FOUND");
+
+  if(!window.meSpeak.isConfigLoaded()){
+   await loadMeSpeakConfig(base+"mespeak_config.json");
+  }
+  await loadMeSpeakVoice(base+"voices/ru.json");
+
+  localTTSReady=true;
+  el.localVoiceState.textContent="ÐÐÐÐÐÐ¬ÐÐ«Ð ÐÐÐÐÐÐ ÐÐÐ¢ÐÐ â¢ ÐÐÐ API-ÐÐÐ®Ð§Ð";
+ })().catch(error=>{
+  localTTSPromise=null;
+  el.localVoiceState.textContent="ÐÐ¨ÐÐÐÐ ÐÐÐÐ Ð£ÐÐÐ ÐÐÐÐÐÐ¬ÐÐÐÐ ÐÐÐÐÐ¡Ð";
+  throw error;
+ });
+
+ return localTTSPromise;
+}
+
+async function createLocalTTS(text){
+ await ensureLocalTTS();
+
+ const wav=window.meSpeak.speak(text,{
+  rawdata:true,
+  voice:"ru",
+  amplitude:92,
+  pitch:43,
+  speed:168,
+  wordgap:1
+ });
+
+ if(!wav)throw new Error("LOCAL TTS GENERATION ERROR");
+
+ if(wav instanceof ArrayBuffer)return wav;
+ if(ArrayBuffer.isView(wav))return wav.buffer.slice(wav.byteOffset,wav.byteOffset+wav.byteLength);
+ if(Array.isArray(wav))return new Uint8Array(wav).buffer;
+
+ throw new Error("LOCAL TTS FORMAT ERROR");
 }
 
 function connectAIVoice(source){
@@ -661,7 +696,7 @@ function connectAIVoice(source){
  const aiFxGain=audioCtx.createGain();
 
 
- // ON: человеческий голос + характерная ТВ-обработка 90-х.
+ // ON: ÑÐµÐ»Ð¾Ð²ÐµÑÐµÑÐºÐ¸Ð¹ Ð³Ð¾Ð»Ð¾Ñ + ÑÐ°ÑÐ°ÐºÑÐµÑÐ½Ð°Ñ Ð¢Ð-Ð¾Ð±ÑÐ°Ð±Ð¾ÑÐºÐ° 90-Ñ.
  const hp=audioCtx.createBiquadFilter();
  hp.type="highpass";
  hp.frequency.value=82;
@@ -707,11 +742,11 @@ function connectAIVoice(source){
  grit.curve=makeTapeCurve(1.75);
  grit.oversample="4x";
 
- // Основная дорожка.
+ // ÐÑÐ½Ð¾Ð²Ð½Ð°Ñ Ð´Ð¾ÑÐ¾Ð¶ÐºÐ°.
  const directGain=audioCtx.createGain();
  directGain.gain.value=.84;
 
- // Два коротких detune-дубля через модулируемые задержки.
+ // ÐÐ²Ð° ÐºÐ¾ÑÐ¾ÑÐºÐ¸Ñ detune-Ð´ÑÐ±Ð»Ñ ÑÐµÑÐµÐ· Ð¼Ð¾Ð´ÑÐ»Ð¸ÑÑÐµÐ¼ÑÐµ Ð·Ð°Ð´ÐµÑÐ¶ÐºÐ¸.
  const detuneA=audioCtx.createDelay(.06);
  detuneA.delayTime.value=.0085;
 
@@ -746,7 +781,7 @@ function connectAIVoice(source){
  const detuneGainB=audioCtx.createGain();
  detuneGainB.gain.value=.22;
 
- // Очень короткий flanger-хвост.
+ // ÐÑÐµÐ½Ñ ÐºÐ¾ÑÐ¾ÑÐºÐ¸Ð¹ flanger-ÑÐ²Ð¾ÑÑ.
  const flangeDelay=audioCtx.createDelay(.03);
  flangeDelay.delayTime.value=.0048;
 
@@ -849,36 +884,45 @@ function startRecorderWithAudio(audioTracks,tag){
 async function startAIRecording(){
  hideWarn();
  const text=el.teleprompterInput.value.trim();
- const key=(el.aiApiKey.value.trim()||localStorage.getItem("danyapezAIApiKey")||"").trim();
 
- if(!text)throw new Error("ВСТАВЬ ТЕКСТ В ТЕЛЕСУФЛЁР.");
- if(text.length>4096)throw new Error("ТЕКСТ СЛИШКОМ ДЛИННЫЙ. МАКСИМУМ 4096 СИМВОЛОВ.");
- if(!key)throw new Error("ВСТАВЬ OPENAI API KEY.");
+ if(!text)throw new Error("ÐÐ¡Ð¢ÐÐÐ¬ Ð¢ÐÐÐ¡Ð¢ Ð Ð¢ÐÐÐÐ¡Ð£Ð¤ÐÐÐ .");
+ if(text.length>6000)throw new Error("Ð¢ÐÐÐ¡Ð¢ Ð¡ÐÐÐ¨ÐÐÐ ÐÐÐÐÐÐ«Ð. ÐÐÐÐ¡ÐÐÐ£Ð 6000 Ð¡ÐÐÐÐÐÐÐ.");
 
- localStorage.setItem("danyapezAIApiKey",key);
- showAIKeyState();
- el.aiRec.disabled=true;el.rec.disabled=true;el.aiRec.classList.add("active");
- setStatus("AI VOICE GENERATION");
+ el.aiRec.disabled=true;
+ el.rec.disabled=true;
+ el.aiRec.classList.add("active");
+ setStatus("LOCAL AI VOICE");
 
  if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
  await audioCtx.resume();
 
- const wav=await createTTS(text,key);
+ const wav=await createLocalTTS(text);
  const buffer=await audioCtx.decodeAudioData(wav.slice(0));
+
  aiAudioSource=audioCtx.createBufferSource();
  aiAudioSource.buffer=buffer;
+
+ // ÐÐÐÐÐ: Ð»Ð¾ÐºÐ°Ð»ÑÐ½ÑÐ¹ AI Ð¿ÑÐ¾ÑÐ¾Ð´Ð¸Ñ ÑÐµÑÐµÐ· ÑÑ Ð¶Ðµ ÑÐµÐ¿Ð¾ÑÐºÑ ÑÑÑÐµÐºÑÐ¾Ð²,
+ // ÑÑÐ¾ Ð¸ Ð¾Ð±ÑÑÐ½ÑÐ¹ REC, Ð° Ð½Ðµ Ð²Ð¾ÑÐ¿ÑÐ¾Ð¸Ð·Ð²Ð¾Ð´Ð¸ÑÑÑ Ð½Ð°Ð¿ÑÑÐ¼ÑÑ.
  connectAIVoice(aiAudioSource);
 
- aiMode=true;aiStopRequested=false;aiMotionTime=0;aiMouthUntil=0;
+ aiMode=true;
+ aiStopRequested=false;
+ aiMotionTime=0;
+ aiMouthUntil=0;
+
  startTeleprompter();
- startRecorderWithAudio(aiRecordingDestination.stream.getAudioTracks(),"AI_1920x1080");
- setStatus("REC AI");
+ startRecorderWithAudio(aiRecordingDestination.stream.getAudioTracks(),"AI_LOCAL_1920x1080");
+ setStatus("REC AI LOCAL");
 
  aiAudioSource.onended=()=>{
   if(recorder&&recorder.state!=="inactive"&&!aiStopRequested){
-   setTimeout(()=>{if(recorder&&recorder.state!=="inactive")recorder.stop()},350);
+   setTimeout(()=>{
+    if(recorder&&recorder.state!=="inactive")recorder.stop();
+   },350);
   }
  };
+
  setTimeout(()=>aiAudioSource.start(),180);
 }
 
@@ -1044,7 +1088,7 @@ function startRec(){
   warn("MICROPHONE TRACK NOT FOUND. VIDEO WILL BE RECORDED WITHOUT AUDIO.");
  }
 
- // Один поток: canvas-видео + микрофон. Так звук и видео стартуют вместе.
+ // ÐÐ´Ð¸Ð½ Ð¿Ð¾ÑÐ¾Ðº: canvas-Ð²Ð¸Ð´ÐµÐ¾ + Ð¼Ð¸ÐºÑÐ¾ÑÐ¾Ð½. Ð¢Ð°Ðº Ð·Ð²ÑÐº Ð¸ Ð²Ð¸Ð´ÐµÐ¾ ÑÑÐ°ÑÑÑÑÑ Ð²Ð¼ÐµÑÑÐµ.
  const mixedStream=new MediaStream([
   ...videoStream.getVideoTracks(),
   ...audioTracks
@@ -1063,7 +1107,7 @@ function startRec(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
 
   el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("×","x")}_embedded_png_audio_try_${stamp}.mp4`;
+  el.downloadZip.download=`danyapez_avatar_${settings.label.replace("Ã","x")}_embedded_png_audio_try_${stamp}.mp4`;
   el.downloadZip.classList.remove("hidden");
   setTimeout(()=>el.downloadZip.click(),120);
 
@@ -1073,7 +1117,7 @@ function startRec(){
   setStatus("READY");
  };
 
- // Более крупные куски обычно стабильнее для монтажа, чем частая нарезка.
+ // ÐÐ¾Ð»ÐµÐµ ÐºÑÑÐ¿Ð½ÑÐµ ÐºÑÑÐºÐ¸ Ð¾Ð±ÑÑÐ½Ð¾ ÑÑÐ°Ð±Ð¸Ð»ÑÐ½ÐµÐµ Ð´Ð»Ñ Ð¼Ð¾Ð½ÑÐ°Ð¶Ð°, ÑÐµÐ¼ ÑÐ°ÑÑÐ°Ñ Ð½Ð°ÑÐµÐ·ÐºÐ°.
  recorder.start(1000);
  startTeleprompter();
 
@@ -1102,10 +1146,7 @@ el.teleprompterScroll.addEventListener("pointermove",e=>{
 });
 el.teleprompterScroll.addEventListener("pointerup",()=>teleDrag=false);
 el.teleprompterScroll.addEventListener("pointercancel",()=>teleDrag=false);
-
-el.aiApiKey.value=localStorage.getItem("danyapezAIApiKey")||"";
-el.aiSaveKey.onclick=saveAIKey;
-showAIKeyState();
+ localStorage.removeItem("danyapezAIApiKey");
 
 voiceFxEnabled=localStorage.getItem("danyapezVoiceFx")==="1";
 setVoiceFxEnabled(voiceFxEnabled);
