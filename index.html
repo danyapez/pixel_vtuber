@@ -89,7 +89,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <div class="teleprompter-editor" id="teleprompterEditor">
 <div class="block-title">ТЕЛЕСУФЛЁР</div>
 <textarea id="teleprompterInput" placeholder="Вставьте текст и нажмите REC RU или REC EN."></textarea>
-<button id="teleprompterDelete" type="button">УДАЛИТЬ ТЕКСТ</button>
+<button id="teleprompterDelete" type="button">ВСТАВИТЬ ТЕКСТ</button>
 </div>
 
 <div class="teleprompter-reader hidden" id="teleprompterReader">
@@ -190,7 +190,8 @@ let micAnalyser=null,micAudioData=null;
 let recorderAudioDestination=null,voiceDryGain=null,voiceFxGain=null,pitchNode=null;
 let voiceFxEnabled=true,pitchWorkletReady=false;
 let teleprompterActive=false,teleprompterSpeakingUntil=0,teleprompterLastFrame=0,teleprompterManualUntil=0;
-let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0,aiActiveButton=null;
+let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0,aiActiveButton=null,aiGraphCleanup=null;
+let stopInProgress=false;
 let recorder=null, chunks=[], lastVideoTime=-1;
 let mediaBunnyPromise=null;
 let stable="static", current="static", since=performance.now();
@@ -463,6 +464,14 @@ async function connectAgentZPreset(source,output,semitones=1.17,rememberPitch=fa
  const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-9.6;limiter.knee.value=1;limiter.ratio.value=20;limiter.attack.value=.002;limiter.release.value=.055;
  const master=audioCtx.createGain();master.gain.value=.4;
  sum.connect(limiter);limiter.connect(master);master.connect(output);
+ return ()=>{
+  try{source.disconnect(hp)}catch(_){}
+  try{phaserLfo.stop()}catch(_){}
+  try{robotOsc.stop()}catch(_){}
+  try{phaserLfo.disconnect()}catch(_){}
+  try{robotOsc.disconnect()}catch(_){}
+  try{master.disconnect()}catch(_){}
+ };
 }
 
 async function buildVoiceGraph(source){
@@ -514,16 +523,26 @@ async function synthesizeText(text,language="ru"){
 }
 
 async function buildAIVoiceGraph(source){
+ if(aiGraphCleanup){try{aiGraphCleanup()}catch(_){}aiGraphCleanup=null}
  aiRecordingDestination=audioCtx.createMediaStreamDestination();
  analyser=audioCtx.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=.7;
  audioData=new Uint8Array(analyser.frequencyBinCount);
  const master=audioCtx.createGain();master.gain.value=1;
- await connectAgentZPreset(source,master,1.17,false);
+ const cleanupPreset=await connectAgentZPreset(source,master,1.17,false);
  master.connect(analyser);master.connect(aiRecordingDestination);master.connect(audioCtx.destination);
+ aiGraphCleanup=()=>{
+  cleanupPreset();
+  try{source.disconnect()}catch(_){}
+  try{master.disconnect()}catch(_){}
+  try{analyser.disconnect()}catch(_){}
+  try{aiRecordingDestination?.disconnect()}catch(_){}
+ };
 }
 
 function finishAI(){
- aiMode=false;aiStopRequested=false;aiAudioSource=null;
+ if(aiAudioSource){aiAudioSource.onended=null;try{aiAudioSource.disconnect()}catch(_){}}
+ if(aiGraphCleanup){try{aiGraphCleanup()}catch(_){}aiGraphCleanup=null}
+ aiMode=false;aiStopRequested=false;aiAudioSource=null;aiRecordingDestination=null;
  analyser=micAnalyser;audioData=micAudioData;
  el.aiRec.classList.remove("active");el.aiRec.textContent="REC RU";
  el.aiRecEn.classList.remove("active");el.aiRecEn.textContent="REC EN";
@@ -552,7 +571,7 @@ async function startAIRecording(language="ru"){
  aiActiveButton.classList.add("active");aiActiveButton.textContent=`REC ${languageTag}`;setStatus(`REC ${languageTag}`);
 
  aiAudioSource.onended=()=>{
-  if(recorder&&recorder.state!=="inactive"&&!aiStopRequested)setTimeout(()=>{if(recorder&&recorder.state!=="inactive")recorder.stop()},350);
+  if(recorder&&recorder.state!=="inactive"&&!aiStopRequested)setTimeout(()=>stopRecording(false),350);
  };
  aiAudioSource.start(audioCtx.currentTime+.18);
 }
@@ -571,6 +590,10 @@ function updateAIMotion(now,vol){
 
 function saveTeleprompter(){
  localStorage.setItem("danyapezTeleprompterText",el.teleprompterInput.value);
+ updateTeleprompterAction();
+}
+function updateTeleprompterAction(){
+ el.teleprompterDelete.textContent=el.teleprompterInput.value.trim()?"УДАЛИТЬ ТЕКСТ":"ВСТАВИТЬ ТЕКСТ";
 }
 function openTeleprompter(reset=true){
  const text=el.teleprompterInput.value.trim();
@@ -585,7 +608,18 @@ function closeTeleprompter(){
  teleprompterActive=false;el.teleprompterReader.classList.add("hidden");el.teleprompterReader.classList.remove("speaking");el.teleprompterEditor.classList.remove("hidden");
 }
 function deleteTeleprompter(){
- el.teleprompterInput.value="";el.teleprompterText.textContent="";localStorage.removeItem("danyapezTeleprompterText");closeTeleprompter();setStatus("TEXT DELETED");
+ el.teleprompterInput.value="";el.teleprompterText.textContent="";localStorage.removeItem("danyapezTeleprompterText");updateTeleprompterAction();closeTeleprompter();setStatus("ТЕКСТ УДАЛЁН");
+}
+async function handleTeleprompterAction(){
+ if(el.teleprompterInput.value.trim()){deleteTeleprompter();return}
+ try{
+  if(!navigator.clipboard?.readText)throw new Error("CLIPBOARD API NOT AVAILABLE");
+  const text=await navigator.clipboard.readText();
+  if(!text.trim()){warn("БУФЕР ОБМЕНА ПУСТ.");return}
+  el.teleprompterInput.value=text;saveTeleprompter();hideWarn();setStatus("ТЕКСТ ВСТАВЛЕН");el.teleprompterInput.focus();
+ }catch(error){
+  console.warn(error);warn("НЕ УДАЛОСЬ ПРОЧИТАТЬ БУФЕР. РАЗРЕШИТЕ ВСТАВКУ В БРАУЗЕРЕ.");
+ }
 }
 let teleprompterNoiseFloor=.006;
 function updateTeleprompter(vol,now){
@@ -737,6 +771,7 @@ function finishRecordingBlob(blob,tag,settings){
  el.downloadZip.classList.remove("hidden");
  setTimeout(()=>el.downloadZip.click(),120);
  setRecordingUi(false);
+ stopInProgress=false;
  if(aiMode)finishAI();
  setStatus("READY");
 }
@@ -810,7 +845,7 @@ async function startPreciseRec(mediaBunny,audioTracks,tag,settings){
    precise.state="inactive";
    finishRecordingBlob(new Blob([bufferTarget.buffer],{type:"video/mp4"}),tag,settings);
   }catch(error){
-   precise.state="inactive";console.error(error);setRecordingUi(false);
+   precise.state="inactive";stopInProgress=false;console.error(error);setRecordingUi(false);
    if(aiMode)finishAI();warn("ОШИБКА ЭКСПОРТА CAPCUT: "+String(error.message||error));setStatus("EXPORT ERROR");
   }
  }};
@@ -820,6 +855,7 @@ async function startPreciseRec(mediaBunny,audioTracks,tag,settings){
 }
 
 async function startRec(audioTracksOverride=null,tag="AGENT_Z"){
+ stopInProgress=false;
  resizeRec();el.downloadZip.classList.add("hidden");setStatus("ПОДГОТОВКА MP4");
  const settings=exportSettings();
  const audioTracks=audioTracksOverride||(recorderAudioDestination?recorderAudioDestination.stream.getAudioTracks():(micStream?micStream.getAudioTracks():[]));
@@ -837,7 +873,8 @@ async function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
 el.teleprompterInput.value=localStorage.getItem("danyapezTeleprompterText")||"";
 el.teleprompterInput.addEventListener("input",saveTeleprompter);
-el.teleprompterDelete.onclick=deleteTeleprompter;
+updateTeleprompterAction();
+el.teleprompterDelete.onclick=handleTeleprompterAction;
 el.teleprompterClose.onclick=closeTeleprompter;
 
 let teleDrag=false,teleStartY=0,teleStartScroll=0;
@@ -881,11 +918,25 @@ async function runAIRecording(language){
 }
 el.aiRec.onclick=()=>runAIRecording("ru");
 el.aiRecEn.onclick=()=>runAIRecording("en");
-el.stop.onclick=()=>{
- aiStopRequested=true;
- if(aiAudioSource){try{aiAudioSource.stop()}catch(_){}}
- if(recorder&&recorder.state!=="inactive")recorder.stop();else if(aiMode)finishAI();
-};
+async function stopRecording(manual=true){
+ if(stopInProgress)return;
+ if(!recorder||recorder.state==="inactive"){
+  if(aiMode)finishAI();
+  setRecordingUi(false);setStatus("READY");return;
+ }
+ stopInProgress=true;
+ if(manual){
+  aiStopRequested=true;
+  if(aiAudioSource){aiAudioSource.onended=null;try{aiAudioSource.stop()}catch(_){}}
+ }
+ el.stop.disabled=true;setStatus("СОХРАНЕНИЕ");
+ try{await recorder.stop()}
+ catch(error){
+  stopInProgress=false;console.error(error);setRecordingUi(false);
+  if(aiMode)finishAI();warn("STOP ERROR: "+String(error.message||error));setStatus("STOP ERROR");
+ }
+}
+el.stop.onclick=()=>stopRecording(true);
 
 el.showCam.onchange=()=>video.classList.toggle("visible",el.showCam.checked);
 
