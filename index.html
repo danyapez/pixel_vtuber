@@ -171,7 +171,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <div class="voice-box">
   <div class="block-title">КИБЕРНЕТИЧЕСКИЙ ГОЛОС ДЛЯ REC</div>
   <button id="voiceFxToggle" type="button">ГОЛОС ВЕДУЩЕГО ДЛЯ REC: OFF</button>
-  <div class="small-note">Кибернетический голос: узнаваемый тембр сохраняется, но добавляются хриплая окраска, электронное искажение, насмешливая подача и лёгкая роботизация.</div>
+  <div class="small-note">Обработка в духе игрового ТВ начала 2000-х: яркий цифровой тембр, короткий harmonizer-дубль, плотная компрессия и лёгкая кибернетическая окраска.</div>
 </div>
 
 <div class="teleprompter-editor" id="teleprompterEditor">
@@ -193,7 +193,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
     <input id="aiApiKey" type="password" placeholder="OpenAI API key: sk-..." autocomplete="off">
     <button id="aiSaveKey" type="button">СОХРАНИТЬ</button>
   </div>
-  <div class="small-note">REC AI озвучивает текст живым кибернетическим голосом: хрипло, насмешливо, эмоционально и слегка роботизированно.</div>
+  <div class="small-note">REC AI использует точно такую же цифровую обработку начала 2000-х, как обычный REC: harmonizer-дубль, detune, компрессия и лёгкая кибернетическая окраска.</div>
 </div>
 
 <label>SIZE
@@ -418,7 +418,7 @@ function buildVoiceGraph(source){
  audioData=new Uint8Array(analyser.frequencyBinCount);
 
  voiceMasterGain=audioCtx.createGain();
- voiceMasterGain.gain.value=.90;
+ voiceMasterGain.gain.value=.92;
 
  voiceDryGain=audioCtx.createGain();
  voiceFxGain=audioCtx.createGain();
@@ -429,107 +429,115 @@ function buildVoiceGraph(source){
  dryHP.frequency.value=68;
  dryHP.Q.value=.7;
 
- // ON: узнаваемый голос с кибернетической, хриплой и насмешливой окраской.
+ // ON: человеческий голос + характерная ТВ-обработка 90-х.
  const hp=audioCtx.createBiquadFilter();
  hp.type="highpass";
- hp.frequency.value=88;
+ hp.frequency.value=82;
  hp.Q.value=.72;
 
  const body=audioCtx.createBiquadFilter();
  body.type="peaking";
- body.frequency.value=190;
+ body.frequency.value=180;
  body.Q.value=.8;
- body.gain.value=1.4;
+ body.gain.value=1.6;
 
  const mudCut=audioCtx.createBiquadFilter();
  mudCut.type="peaking";
- mudCut.frequency.value=340;
- mudCut.Q.value=1.12;
- mudCut.gain.value=-3.0;
+ mudCut.frequency.value=320;
+ mudCut.Q.value=1.05;
+ mudCut.gain.value=-2.6;
 
- const sneer=audioCtx.createBiquadFilter();
- sneer.type="peaking";
- sneer.frequency.value=1250;
- sneer.Q.value=1.0;
- sneer.gain.value=4.5;
+ const presence=audioCtx.createBiquadFilter();
+ presence.type="peaking";
+ presence.frequency.value=1900;
+ presence.Q.value=.9;
+ presence.gain.value=4.1;
 
  const bite=audioCtx.createBiquadFilter();
  bite.type="peaking";
- bite.frequency.value=3150;
+ bite.frequency.value=4100;
  bite.Q.value=.95;
- bite.gain.value=3.7;
+ bite.gain.value=3.2;
 
  const topCut=audioCtx.createBiquadFilter();
  topCut.type="lowpass";
- topCut.frequency.value=6200;
+ topCut.frequency.value=7600;
  topCut.Q.value=.72;
 
  const compressor=audioCtx.createDynamicsCompressor();
- compressor.threshold.value=-27;
- compressor.knee.value=9;
- compressor.ratio.value=5.2;
- compressor.attack.value=.003;
- compressor.release.value=.10;
+ compressor.threshold.value=-25;
+ compressor.knee.value=12;
+ compressor.ratio.value=4.5;
+ compressor.attack.value=.004;
+ compressor.release.value=.12;
 
- // Хрип и цифровая шероховатость.
  const grit=audioCtx.createWaveShaper();
- grit.curve=makeTapeCurve(3.35);
+ grit.curve=makeTapeCurve(1.75);
  grit.oversample="4x";
 
- // Лёгкая кибернетическая модуляция, чтобы голос оставался узнаваемым.
- const cyberGain=audioCtx.createGain();
- cyberGain.gain.value=.78;
-
- const cyberOsc=audioCtx.createOscillator();
- cyberOsc.type="triangle";
- cyberOsc.frequency.value=32;
-
- const cyberDepth=audioCtx.createGain();
- cyberDepth.gain.value=.16;
-
- cyberOsc.connect(cyberDepth);
- cyberDepth.connect(cyberGain.gain);
- cyberOsc.start();
-
- // Цифровой дубль.
- const microDelay=audioCtx.createDelay(.06);
- microDelay.delayTime.value=.011;
-
- const flutter=audioCtx.createOscillator();
- flutter.type="triangle";
- flutter.frequency.value=4.3;
-
- const flutterDepth=audioCtx.createGain();
- flutterDepth.gain.value=.0016;
-
- flutter.connect(flutterDepth);
- flutterDepth.connect(microDelay.delayTime);
- flutter.start();
-
+ // Основная дорожка.
  const directGain=audioCtx.createGain();
- directGain.gain.value=.86;
+ directGain.gain.value=.84;
 
- const doubleGain=audioCtx.createGain();
- doubleGain.gain.value=.22;
+ // Два коротких detune-дубля через модулируемые задержки.
+ const detuneA=audioCtx.createDelay(.06);
+ detuneA.delayTime.value=.0085;
 
- // Короткий металлический хвост.
- const echo=audioCtx.createDelay(.14);
- echo.delayTime.value=.052;
+ const detuneB=audioCtx.createDelay(.06);
+ detuneB.delayTime.value=.0145;
 
- const echoBand=audioCtx.createBiquadFilter();
- echoBand.type="bandpass";
- echoBand.frequency.value=2050;
- echoBand.Q.value=1.15;
+ const lfoA=audioCtx.createOscillator();
+ lfoA.type="sine";
+ lfoA.frequency.value=.82;
 
- const echoGain=audioCtx.createGain();
- echoGain.gain.value=.09;
+ const lfoB=audioCtx.createOscillator();
+ lfoB.type="sine";
+ lfoB.frequency.value=1.17;
+
+ const depthA=audioCtx.createGain();
+ depthA.gain.value=.0014;
+
+ const depthB=audioCtx.createGain();
+ depthB.gain.value=.0018;
+
+ lfoA.connect(depthA);
+ depthA.connect(detuneA.delayTime);
+ lfoA.start();
+
+ lfoB.connect(depthB);
+ depthB.connect(detuneB.delayTime);
+ lfoB.start();
+
+ const detuneGainA=audioCtx.createGain();
+ detuneGainA.gain.value=.28;
+
+ const detuneGainB=audioCtx.createGain();
+ detuneGainB.gain.value=.22;
+
+ // Очень короткий flanger-хвост.
+ const flangeDelay=audioCtx.createDelay(.03);
+ flangeDelay.delayTime.value=.0048;
+
+ const flangeLfo=audioCtx.createOscillator();
+ flangeLfo.type="triangle";
+ flangeLfo.frequency.value=.34;
+
+ const flangeDepth=audioCtx.createGain();
+ flangeDepth.gain.value=.0013;
+
+ flangeLfo.connect(flangeDepth);
+ flangeDepth.connect(flangeDelay.delayTime);
+ flangeLfo.start();
+
+ const flangeGain=audioCtx.createGain();
+ flangeGain.gain.value=.08;
 
  const limiter=audioCtx.createDynamicsCompressor();
- limiter.threshold.value=-4.2;
- limiter.knee.value=1;
- limiter.ratio.value=16;
+ limiter.threshold.value=-4.5;
+ limiter.knee.value=1.2;
+ limiter.ratio.value=14;
  limiter.attack.value=.001;
- limiter.release.value=.065;
+ limiter.release.value=.07;
 
  source.connect(dryHP);
  dryHP.connect(voiceDryGain);
@@ -537,24 +545,26 @@ function buildVoiceGraph(source){
  source.connect(hp);
  hp.connect(body);
  body.connect(mudCut);
- mudCut.connect(sneer);
- sneer.connect(bite);
+ mudCut.connect(presence);
+ presence.connect(bite);
  bite.connect(topCut);
  topCut.connect(compressor);
  compressor.connect(grit);
- grit.connect(cyberGain);
 
- cyberGain.connect(directGain);
+ grit.connect(directGain);
  directGain.connect(limiter);
 
- cyberGain.connect(microDelay);
- microDelay.connect(doubleGain);
- doubleGain.connect(limiter);
+ grit.connect(detuneA);
+ detuneA.connect(detuneGainA);
+ detuneGainA.connect(limiter);
 
- cyberGain.connect(echo);
- echo.connect(echoBand);
- echoBand.connect(echoGain);
- echoGain.connect(limiter);
+ grit.connect(detuneB);
+ detuneB.connect(detuneGainB);
+ detuneGainB.connect(limiter);
+
+ grit.connect(flangeDelay);
+ flangeDelay.connect(flangeGain);
+ flangeGain.connect(limiter);
 
  limiter.connect(voiceFxGain);
 
@@ -625,7 +635,7 @@ async function createTTS(text,key){
    model:"gpt-4o-mini-tts",
    voice:"ash",
    input:text,
-   instructions:"Speak in Russian with a young, lively and recognizable personality. Sound cybernetic and slightly distorted, with a dry raspy edge and a playful mocking undertone, as if the speaker is amused and teasing the listener. Keep the delivery spontaneous, expressive and conversational, not like a professional announcer. Use small changes of pace, short pauses, sly emphasis, restrained chuckles in the tone, and occasional sharp energetic accents. Preserve clear intelligibility and a human core under the electronic effect. No horror voice, no anonymous-witness effect, no deep ominous bass, no whispering, and do not imitate any real person.",
+   instructions:"Speak in Russian like a lively young gaming-show host from the early 2000s. Sound energetic, playful, slightly sarcastic and conversational, not like a formal announcer. Use quick reactions, expressive emphasis, a light grin in the voice and natural changes of pace. Keep the voice bright, digital and futuristic in character, while remaining clearly human and understandable. No horror tone, no anonymous-witness effect, no deep ominous bass, and do not imitate any real person.",
    response_format:"wav"
   })
  });
@@ -645,132 +655,156 @@ function connectAIVoice(source){
  analyser.fftSize=512;
  audioData=new Uint8Array(analyser.frequencyBinCount);
 
+ voiceMasterGain=audioCtx.createGain();
+ voiceMasterGain.gain.value=.92;
+
+ const aiFxGain=audioCtx.createGain();
+
+
+ // ON: человеческий голос + характерная ТВ-обработка 90-х.
  const hp=audioCtx.createBiquadFilter();
  hp.type="highpass";
- hp.frequency.value=88;
+ hp.frequency.value=82;
  hp.Q.value=.72;
 
  const body=audioCtx.createBiquadFilter();
  body.type="peaking";
- body.frequency.value=185;
+ body.frequency.value=180;
  body.Q.value=.8;
- body.gain.value=1.2;
+ body.gain.value=1.6;
 
  const mudCut=audioCtx.createBiquadFilter();
  mudCut.type="peaking";
- mudCut.frequency.value=330;
- mudCut.Q.value=1.1;
- mudCut.gain.value=-2.7;
+ mudCut.frequency.value=320;
+ mudCut.Q.value=1.05;
+ mudCut.gain.value=-2.6;
 
- const sneer=audioCtx.createBiquadFilter();
- sneer.type="peaking";
- sneer.frequency.value=1320;
- sneer.Q.value=1.0;
- sneer.gain.value=4.2;
+ const presence=audioCtx.createBiquadFilter();
+ presence.type="peaking";
+ presence.frequency.value=1900;
+ presence.Q.value=.9;
+ presence.gain.value=4.1;
 
  const bite=audioCtx.createBiquadFilter();
  bite.type="peaking";
- bite.frequency.value=3250;
+ bite.frequency.value=4100;
  bite.Q.value=.95;
- bite.gain.value=3.4;
+ bite.gain.value=3.2;
 
  const topCut=audioCtx.createBiquadFilter();
  topCut.type="lowpass";
- topCut.frequency.value=6300;
+ topCut.frequency.value=7600;
  topCut.Q.value=.72;
 
  const compressor=audioCtx.createDynamicsCompressor();
- compressor.threshold.value=-26;
- compressor.knee.value=9;
- compressor.ratio.value=4.8;
- compressor.attack.value=.003;
- compressor.release.value=.105;
+ compressor.threshold.value=-25;
+ compressor.knee.value=12;
+ compressor.ratio.value=4.5;
+ compressor.attack.value=.004;
+ compressor.release.value=.12;
 
  const grit=audioCtx.createWaveShaper();
- grit.curve=makeTapeCurve(3.15);
+ grit.curve=makeTapeCurve(1.75);
  grit.oversample="4x";
 
- const cyberGain=audioCtx.createGain();
- cyberGain.gain.value=.80;
-
- const cyberOsc=audioCtx.createOscillator();
- cyberOsc.type="triangle";
- cyberOsc.frequency.value=30;
-
- const cyberDepth=audioCtx.createGain();
- cyberDepth.gain.value=.15;
-
- cyberOsc.connect(cyberDepth);
- cyberDepth.connect(cyberGain.gain);
- cyberOsc.start();
-
- const microDelay=audioCtx.createDelay(.06);
- microDelay.delayTime.value=.0105;
-
- const flutter=audioCtx.createOscillator();
- flutter.type="triangle";
- flutter.frequency.value=4.0;
-
- const flutterDepth=audioCtx.createGain();
- flutterDepth.gain.value=.0015;
-
- flutter.connect(flutterDepth);
- flutterDepth.connect(microDelay.delayTime);
- flutter.start();
-
+ // Основная дорожка.
  const directGain=audioCtx.createGain();
- directGain.gain.value=.88;
+ directGain.gain.value=.84;
 
- const doubleGain=audioCtx.createGain();
- doubleGain.gain.value=.20;
+ // Два коротких detune-дубля через модулируемые задержки.
+ const detuneA=audioCtx.createDelay(.06);
+ detuneA.delayTime.value=.0085;
 
- const echo=audioCtx.createDelay(.14);
- echo.delayTime.value=.050;
+ const detuneB=audioCtx.createDelay(.06);
+ detuneB.delayTime.value=.0145;
 
- const echoBand=audioCtx.createBiquadFilter();
- echoBand.type="bandpass";
- echoBand.frequency.value=2100;
- echoBand.Q.value=1.1;
+ const lfoA=audioCtx.createOscillator();
+ lfoA.type="sine";
+ lfoA.frequency.value=.82;
 
- const echoGain=audioCtx.createGain();
- echoGain.gain.value=.085;
+ const lfoB=audioCtx.createOscillator();
+ lfoB.type="sine";
+ lfoB.frequency.value=1.17;
+
+ const depthA=audioCtx.createGain();
+ depthA.gain.value=.0014;
+
+ const depthB=audioCtx.createGain();
+ depthB.gain.value=.0018;
+
+ lfoA.connect(depthA);
+ depthA.connect(detuneA.delayTime);
+ lfoA.start();
+
+ lfoB.connect(depthB);
+ depthB.connect(detuneB.delayTime);
+ lfoB.start();
+
+ const detuneGainA=audioCtx.createGain();
+ detuneGainA.gain.value=.28;
+
+ const detuneGainB=audioCtx.createGain();
+ detuneGainB.gain.value=.22;
+
+ // Очень короткий flanger-хвост.
+ const flangeDelay=audioCtx.createDelay(.03);
+ flangeDelay.delayTime.value=.0048;
+
+ const flangeLfo=audioCtx.createOscillator();
+ flangeLfo.type="triangle";
+ flangeLfo.frequency.value=.34;
+
+ const flangeDepth=audioCtx.createGain();
+ flangeDepth.gain.value=.0013;
+
+ flangeLfo.connect(flangeDepth);
+ flangeDepth.connect(flangeDelay.delayTime);
+ flangeLfo.start();
+
+ const flangeGain=audioCtx.createGain();
+ flangeGain.gain.value=.08;
 
  const limiter=audioCtx.createDynamicsCompressor();
- limiter.threshold.value=-4.2;
- limiter.knee.value=1;
- limiter.ratio.value=16;
+ limiter.threshold.value=-4.5;
+ limiter.knee.value=1.2;
+ limiter.ratio.value=14;
  limiter.attack.value=.001;
- limiter.release.value=.065;
+ limiter.release.value=.07;
 
- const out=audioCtx.createGain();
- out.gain.value=.94;
 
  source.connect(hp);
  hp.connect(body);
  body.connect(mudCut);
- mudCut.connect(sneer);
- sneer.connect(bite);
+ mudCut.connect(presence);
+ presence.connect(bite);
  bite.connect(topCut);
  topCut.connect(compressor);
  compressor.connect(grit);
- grit.connect(cyberGain);
 
- cyberGain.connect(directGain);
+ grit.connect(directGain);
  directGain.connect(limiter);
 
- cyberGain.connect(microDelay);
- microDelay.connect(doubleGain);
- doubleGain.connect(limiter);
+ grit.connect(detuneA);
+ detuneA.connect(detuneGainA);
+ detuneGainA.connect(limiter);
 
- cyberGain.connect(echo);
- echo.connect(echoBand);
- echoBand.connect(echoGain);
- echoGain.connect(limiter);
+ grit.connect(detuneB);
+ detuneB.connect(detuneGainB);
+ detuneGainB.connect(limiter);
 
- limiter.connect(out);
- out.connect(analyser);
- out.connect(aiRecordingDestination);
- out.connect(audioCtx.destination);
+ grit.connect(flangeDelay);
+ flangeDelay.connect(flangeGain);
+ flangeGain.connect(limiter);
+
+ limiter.connect(aiFxGain);
+
+ aiFxGain.connect(voiceMasterGain);
+
+ voiceMasterGain.connect(analyser);
+ voiceMasterGain.connect(aiRecordingDestination);
+ voiceMasterGain.connect(audioCtx.destination);
+
+
 }
 
 function startRecorderWithAudio(audioTracks,tag){
