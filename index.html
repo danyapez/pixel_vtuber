@@ -514,7 +514,7 @@ async function startAIRecording(){
  if(recorder&&recorder.state!=="inactive")throw new Error("ЗАПИСЬ УЖЕ ИДЁТ.");
 
  hideWarn();el.aiRec.disabled=true;el.rec.disabled=true;el.aiRec.classList.add("active");el.aiRec.textContent="ЗАГРУЗКА";setStatus("ЗАГРУЗКА");
- if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100})}catch(_){audioCtx=new (window.AudioContext||window.webkitAudioContext)()}}
+ if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000})}catch(_){audioCtx=new (window.AudioContext||window.webkitAudioContext)()}}
  await audioCtx.resume();
 
  const buffer=await synthesizeText(text);
@@ -587,7 +587,7 @@ async function initCamera(){
 
  stream=await navigator.mediaDevices.getUserMedia({
   video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
-  audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:{ideal:44100},channelCount:{ideal:1}}
+  audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:{ideal:48000},channelCount:{ideal:1}}
  });
 
  video.srcObject=stream;
@@ -596,7 +596,7 @@ async function initCamera(){
  micStream=new MediaStream(stream.getAudioTracks());
 
  try{
-  audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});
  }catch(e){
   audioCtx=new (window.AudioContext||window.webkitAudioContext)();
  }
@@ -749,8 +749,8 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   setStatus("READY");
  };
 
- // Более крупные куски обычно стабильнее для монтажа, чем частая нарезка.
- recorder.start(1000);
+ // Один цельный фрагмент даёт CapCut стабильные таймкоды без секундных стыков.
+ recorder.start();
  if(el.teleprompterInput.value.trim())openTeleprompter(true);
 
  el.format.textContent="MP4";
