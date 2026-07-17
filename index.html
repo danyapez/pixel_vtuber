@@ -750,7 +750,7 @@ async function ensureTTS(){
     const prefix='var Module={locateFile:function(){return "'+dataUrl+'";}};\n';
     ttsWorkerUrl=URL.createObjectURL(new Blob([prefix,decodeBase64Text(ESPEAK_WORKER_JS_B64)],{type:"application/javascript"}));
    }
-   ttsEngine=new window.SimpleTTS({workerPath:ttsWorkerUrl,defaultVoice:"ru",defaultRate:165,defaultPitch:36,defaultVolume:.94,enhanceAudio:false});
+   ttsEngine=new window.SimpleTTS({workerPath:ttsWorkerUrl,defaultVoice:"ru+iven3",defaultRate:205,defaultPitch:48,defaultVolume:.94,enhanceAudio:false});
    const timer=setTimeout(()=>reject(new Error("TTS TIMEOUT")),45000);
    ttsEngine.onReady(error=>{
     clearTimeout(timer);
@@ -765,10 +765,12 @@ async function synthesizeText(text){
  const engine=await ensureTTS();
  return new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>reject(new Error("TTS GENERATION TIMEOUT")),120000);
-  engine.speak(text,{voice:"ru",rate:195,pitch:50,volume:.94,enhance:false},(samples,sampleRate)=>{
+  engine.speak(text,{voice:"ru+iven3",rate:205,pitch:48,volume:.94,enhance:false},(samples,sampleRate)=>{
    clearTimeout(timer);
    if(!samples?.length){reject(new Error("TTS GENERATION ERROR"));return}
-   resolve({samples,sampleRate:Number(sampleRate)||22050});
+   const mono=new Float32Array(Math.ceil(samples.length/2));
+   for(let sourceIndex=0,targetIndex=0;sourceIndex<samples.length;sourceIndex+=2,targetIndex++)mono[targetIndex]=samples[sourceIndex];
+   resolve({samples:mono,sampleRate:Number(sampleRate)||22050});
   });
  });
 }
