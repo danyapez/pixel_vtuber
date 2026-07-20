@@ -187,8 +187,8 @@ let recorderAudioDestination=null,voiceDryGain=null,voiceFxGain=null,pitchNode=n
 let voiceFxEnabled=true,pitchWorkletReady=false;
 let teleprompterActive=false,teleprompterSpeakingUntil=0,teleprompterLastFrame=0,teleprompterManualUntil=0;
 let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0;
-let aiEnvelope=null,aiEnvelopeStep=.02,aiLastEnergy=0;
-let aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTeleprompterWords=[],aiTeleprompterWeights=[],aiTeleprompterTotalWeight=0,aiTeleprompterWordIndex=-1;
+let aiEnvelope=null,aiEnvelopeStep=.02,aiLastEnergy=0,aiProcessingLatency=0;
+let aiSourceStartAt=0,aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTeleprompterWords=[],aiTeleprompterWeights=[],aiTeleprompterTotalWeight=0,aiTeleprompterWordIndex=-1;
 let aiMutedMicTracks=[],audioSessionBeforeAI=null;
 let recorder=null, chunks=[], lastVideoTime=-1;
 let stable="static", current="static", since=performance.now();
@@ -459,7 +459,7 @@ async function edgeTTSFetch(url,options={},attempts=3){
 async function synthesizeText(text){
  const submission=await edgeTTSFetch(EDGE_TTS_API,{
   method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({data:[text,EDGE_TTS_VOICE,2,3]})
+  body:JSON.stringify({data:[text,EDGE_TTS_VOICE,20,0]})
  });
  const submitted=await submission.json();
  if(!submitted.event_id)throw new Error("AI VOICE START ERROR");
@@ -500,31 +500,27 @@ async function buildAIVoiceGraph(source){
  const fxSum=audioCtx.createGain(),mainGain=audioCtx.createGain();mainGain.gain.value=.98;
 
  source.connect(hp);hp.connect(body);body.connect(mud);mud.connect(announcer);announcer.connect(presence);presence.connect(compressor);compressor.connect(grit);
- grit.connect(mainGain);mainGain.connect(fxSum);
 
  const aiPitch=await createPitchNode();
+ let voiceTap=grit;aiProcessingLatency=0;
  if(aiPitch){
-  const pitchTone=audioCtx.createBiquadFilter();pitchTone.type="lowpass";pitchTone.frequency.value=7200;pitchTone.Q.value=.7;
-  const pitchDelay=audioCtx.createDelay(.08);pitchDelay.delayTime.value=.007;
-  const pitchGain=audioCtx.createGain();pitchGain.gain.value=.13;
-  grit.connect(aiPitch);aiPitch.connect(pitchTone);pitchTone.connect(pitchDelay);pitchDelay.connect(pitchGain);pitchGain.connect(fxSum);
- }else{
-  const chorusDelay=audioCtx.createDelay(.08);chorusDelay.delayTime.value=.014;
-  const chorusLfo=audioCtx.createOscillator(),chorusDepth=audioCtx.createGain(),chorusGain=audioCtx.createGain();
-  chorusLfo.type="sine";chorusLfo.frequency.value=.72;chorusDepth.gain.value=.0022;chorusGain.gain.value=.24;
-  chorusLfo.connect(chorusDepth);chorusDepth.connect(chorusDelay.delayTime);chorusLfo.start();
-  grit.connect(chorusDelay);chorusDelay.connect(chorusGain);chorusGain.connect(fxSum);
+  aiPitch.port.postMessage({semitones:2.35});
+  const pitchTone=audioCtx.createBiquadFilter();pitchTone.type="lowpass";pitchTone.frequency.value=11500;pitchTone.Q.value=.55;
+  grit.connect(aiPitch);aiPitch.connect(pitchTone);voiceTap=pitchTone;aiProcessingLatency=.105;
  }
+ voiceTap.connect(mainGain);mainGain.connect(fxSum);
 
- const doubleDelay=audioCtx.createDelay(.08);doubleDelay.delayTime.value=.032;
- const doubleTone=audioCtx.createBiquadFilter();doubleTone.type="lowpass";doubleTone.frequency.value=6200;
- const doubleGain=audioCtx.createGain();doubleGain.gain.value=.026;
- grit.connect(doubleDelay);doubleDelay.connect(doubleTone);doubleTone.connect(doubleGain);doubleGain.connect(fxSum);
+ const echo1Delay=audioCtx.createDelay(.12);echo1Delay.delayTime.value=.046;
+ const echo1HP=audioCtx.createBiquadFilter();echo1HP.type="highpass";echo1HP.frequency.value=280;echo1HP.Q.value=.65;
+ const echo1LP=audioCtx.createBiquadFilter();echo1LP.type="lowpass";echo1LP.frequency.value=3800;echo1LP.Q.value=.7;
+ const echo1Gain=audioCtx.createGain();echo1Gain.gain.value=.14;
+ voiceTap.connect(echo1Delay);echo1Delay.connect(echo1HP);echo1HP.connect(echo1LP);echo1LP.connect(echo1Gain);echo1Gain.connect(fxSum);
 
- const robotBand=audioCtx.createBiquadFilter();robotBand.type="bandpass";robotBand.frequency.value=2250;robotBand.Q.value=1.25;
- const robotDelay=audioCtx.createDelay(.03);robotDelay.delayTime.value=.0048;
- const robotGain=audioCtx.createGain();robotGain.gain.value=.055;
- grit.connect(robotBand);robotBand.connect(robotDelay);robotDelay.connect(robotGain);robotGain.connect(fxSum);
+ const echo2Delay=audioCtx.createDelay(.08);echo2Delay.delayTime.value=.046;
+ const echo2HP=audioCtx.createBiquadFilter();echo2HP.type="highpass";echo2HP.frequency.value=420;echo2HP.Q.value=.7;
+ const echo2LP=audioCtx.createBiquadFilter();echo2LP.type="lowpass";echo2LP.frequency.value=2800;echo2LP.Q.value=.75;
+ const echo2Gain=audioCtx.createGain();echo2Gain.gain.value=.035;
+ echo1Delay.connect(echo2Delay);echo2Delay.connect(echo2HP);echo2HP.connect(echo2LP);echo2LP.connect(echo2Gain);echo2Gain.connect(fxSum);
 
  const radioCut=audioCtx.createBiquadFilter();radioCut.type="lowpass";radioCut.frequency.value=14000;radioCut.Q.value=.7;
  const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-4;limiter.knee.value=2;limiter.ratio.value=10;limiter.attack.value=.002;limiter.release.value=.075;
@@ -536,8 +532,8 @@ async function buildAIVoiceGraph(source){
 function finishAI(){
  restoreAISpeakerOutput();
  aiMode=false;aiStopRequested=false;aiAudioSource=null;
- aiEnvelope=null;aiLastEnergy=0;
- aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;
+ aiEnvelope=null;aiLastEnergy=0;aiProcessingLatency=0;
+ aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;
  analyser=micAnalyser;audioData=micAudioData;
  el.aiRec.classList.remove("active");el.aiRec.textContent="REC AI";
 }
@@ -595,7 +591,8 @@ async function startAIRecording(){
 
  aiMode=true;aiStopRequested=false;aiMotionTime=0;aiMouthUntil=0;
  aiTeleprompterDuration=buffer.duration;
- aiTeleprompterStartAt=audioCtx.currentTime+.28;
+ aiSourceStartAt=audioCtx.currentTime+.28;
+ aiTeleprompterStartAt=aiSourceStartAt+aiProcessingLatency;
  prepareAISpeakerOutput();
  const started=startRec(aiRecordingDestination.stream.getAudioTracks(),"AI_AGENT_Z");
  if(!started){finishAI();throw new Error("ЗАПИСЬ MP4 НЕ ПОДДЕРЖИВАЕТСЯ.")}
@@ -605,7 +602,7 @@ async function startAIRecording(){
   if(recorder&&recorder.state!=="inactive"&&!aiStopRequested)setTimeout(()=>{if(recorder&&recorder.state!=="inactive")recorder.stop()},350);
  };
  await audioCtx.resume();
- aiAudioSource.start(aiTeleprompterStartAt);
+ aiAudioSource.start(aiSourceStartAt);
 }
 
 function updateAIMotion(now,vol){
