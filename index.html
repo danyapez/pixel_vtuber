@@ -651,13 +651,17 @@ function updateAIMotion(now,vol){
   energy=Math.max(aiEnvelope[Math.max(0,frame-1)]||0,aiEnvelope[frame]||0,aiEnvelope[Math.min(aiEnvelope.length-1,frame+1)]||0);
  }
  aiLastEnergy=aiLastEnergy*.45+energy*.55;
- const t=Math.max(0,elapsed),drive=playing?Math.min(1,.25+aiLastEnergy):0;
+ const drive=playing?Math.min(1,.25+aiLastEnergy):0;
  const motionAmount=Math.max(0,Math.min(1,Number(el.move.value)/220));
  if(playing){
-  // Быстрое непрерывное движение из стороны в сторону без случайных рывков.
-  const speechStrength=.72+drive*.28;
-  head.x=Math.sin(t*3.9)*28*speechStrength*motionAmount;
-  head.y=Math.sin(t*7.8+.6)*4.5*drive*motionAmount;
+  // Во время диалога аватар резко перескакивает в случайные позиции слева и справа.
+  if(now>=aiMotionTime){
+   aiMotionTime=now+150+Math.random()*260;
+   const direction=Math.random()<.5?-1:1;
+   const distance=(14+Math.random()*16)*(.72+drive*.28)*motionAmount;
+   head.x=Math.round(direction*distance/4)*4;
+   head.y=Math.round(((Math.random()*2-1)*7*drive*motionAmount)/4)*4;
+  }
  }else{head.x*=.9;head.y*=.9}
  if(now>aiExpressionTime){
   aiExpressionTime=now+240+Math.random()*380;
