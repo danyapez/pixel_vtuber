@@ -459,7 +459,9 @@ async function edgeTTSFetch(url,options={},attempts=3){
 async function synthesizeText(text){
  const submission=await edgeTTSFetch(EDGE_TTS_API,{
   method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({data:[text,EDGE_TTS_VOICE,20,0]})
+  // The Friday reference used Florian at +20% rate and about +21 Hz pitch.
+  // Let Edge TTS create that pitch natively so the voice stays clean and human.
+  body:JSON.stringify({data:[text,EDGE_TTS_VOICE,20,21]})
  });
  const submitted=await submission.json();
  if(!submitted.event_id)throw new Error("AI VOICE START ERROR");
@@ -499,15 +501,11 @@ async function buildAIVoiceGraph(source){
  const grit=audioCtx.createWaveShaper();grit.curve=makeDriveCurve(.72);grit.oversample="4x";
  const fxSum=audioCtx.createGain(),mainGain=audioCtx.createGain();mainGain.gain.value=.98;
 
- source.connect(hp);hp.connect(body);body.connect(mud);mud.connect(announcer);announcer.connect(presence);presence.connect(compressor);compressor.connect(grit);
+ // AI pitch is already produced by Edge TTS. Running it through the browser
+ // pitch shifter again raised Florian far above the measured 164–165 Hz target.
+ source.connect(hp);hp.connect(body);body.connect(mud);mud.connect(announcer);announcer.connect(presence);presence.connect(grit);
 
- const aiPitch=await createPitchNode();
  let voiceTap=grit;aiProcessingLatency=0;
- if(aiPitch){
-  aiPitch.port.postMessage({semitones:2.35});
-  const pitchTone=audioCtx.createBiquadFilter();pitchTone.type="lowpass";pitchTone.frequency.value=11500;pitchTone.Q.value=.55;
-  grit.connect(aiPitch);aiPitch.connect(pitchTone);voiceTap=pitchTone;aiProcessingLatency=.105;
- }
  voiceTap.connect(mainGain);mainGain.connect(fxSum);
 
  const echo1Delay=audioCtx.createDelay(.12);echo1Delay.delayTime.value=.046;
@@ -524,7 +522,8 @@ async function buildAIVoiceGraph(source){
 
  const radioCut=audioCtx.createBiquadFilter();radioCut.type="lowpass";radioCut.frequency.value=14000;radioCut.Q.value=.7;
  const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-4;limiter.knee.value=2;limiter.ratio.value=10;limiter.attack.value=.002;limiter.release.value=.075;
- const master=audioCtx.createGain();master.gain.value=.92;
+ // Match the saved Friday reference instead of the over-compressed loud version.
+ const master=audioCtx.createGain();master.gain.value=.53;
  fxSum.connect(radioCut);radioCut.connect(limiter);limiter.connect(master);
  master.connect(analyser);master.connect(aiRecordingDestination);master.connect(audioCtx.destination);
 }
