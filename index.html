@@ -192,7 +192,7 @@ let micAnalyser=null,micAudioData=null;
 let recorderAudioDestination=null,voiceDryGain=null,voiceFxGain=null,pitchNode=null;
 let voiceFxEnabled=true,pitchWorkletReady=false;
 let teleprompterActive=false,teleprompterSpeakingUntil=0,teleprompterLastFrame=0,teleprompterManualUntil=0;
-let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiRobotOscillator=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0;
+let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiRobotOscillator=null,aiStopRequested=false,aiMotionTime=0,aiExpressionTime=0,aiMouthUntil=0;
 let aiEnvelope=null,aiEnvelopeStep=.02,aiLastEnergy=0,aiProcessingLatency=0;
 let aiSourceStartAt=0,aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTeleprompterWords=[],aiTeleprompterWeights=[],aiTeleprompterTotalWeight=0,aiTeleprompterWordIndex=-1;
 let aiMutedMicTracks=[],audioSessionBeforeAI=null;
@@ -455,6 +455,8 @@ async function buildVoiceGraph(source){
  fxSum.connect(radioCut);radioCut.connect(limiter);limiter.connect(voiceFxGain);
 
  voiceDryGain.connect(master);voiceFxGain.connect(master);master.connect(analyser);master.connect(recorderAudioDestination);
+ // Safari стабильнее обрабатывает микрофон, когда граф связан с audio destination.
+ const keepAlive=audioCtx.createGain();keepAlive.gain.value=0;master.connect(keepAlive);keepAlive.connect(audioCtx.destination);
  setVoiceFxEnabled(voiceFxEnabled);setVoiceDepth(el.voiceDepth.value);
 }
 
@@ -565,7 +567,7 @@ async function buildAIVoiceGraph(source){
 function finishAI(){
  restoreAISpeakerOutput();
  if(aiRobotOscillator){try{aiRobotOscillator.stop()}catch(error){}try{aiRobotOscillator.disconnect()}catch(error){}aiRobotOscillator=null}
- aiMode=false;aiStopRequested=false;aiAudioSource=null;
+ aiMode=false;aiStopRequested=false;aiAudioSource=null;aiMotionTime=0;aiExpressionTime=0;
  aiEnvelope=null;aiLastEnergy=0;aiProcessingLatency=0;
  aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;
  analyser=micAnalyser;audioData=micAudioData;
@@ -623,7 +625,7 @@ async function startAIRecording(){
  aiAudioSource=audioCtx.createBufferSource();aiAudioSource.buffer=buffer;
  await buildAIVoiceGraph(aiAudioSource);
 
- aiMode=true;aiStopRequested=false;aiMotionTime=0;aiMouthUntil=0;
+ aiMode=true;aiStopRequested=false;aiMotionTime=0;aiExpressionTime=0;aiMouthUntil=0;
  aiTeleprompterDuration=buffer.duration;
  aiSourceStartAt=audioCtx.currentTime+.28;
  aiTeleprompterStartAt=aiSourceStartAt+aiProcessingLatency;
@@ -648,17 +650,21 @@ function updateAIMotion(now,vol){
   energy=Math.max(aiEnvelope[Math.max(0,frame-1)]||0,aiEnvelope[frame]||0,aiEnvelope[Math.min(aiEnvelope.length-1,frame+1)]||0);
  }
  aiLastEnergy=aiLastEnergy*.45+energy*.55;
- const t=Math.max(0,elapsed),drive=playing?Math.min(1,.25+aiLastEnergy):0;
+ const drive=playing?Math.min(1,.25+aiLastEnergy):0;
  const motionAmount=Math.max(0,Math.min(1,Number(el.move.value)/220));
  if(playing){
-  // Живое движение в ритме AI-речи, но с жёсткими пределами без сильной болтанки.
-  const x=(Math.sin(t*3.05)*20+Math.sin(t*.92+1.2)*11+Math.sin(t*8.4)*drive*7)*motionAmount;
-  const y=(Math.sin(t*2.25+.5)*10+Math.sin(t*6.1)*drive*5)*motionAmount;
-  head.x=Math.max(-38,Math.min(38,x));
-  head.y=Math.max(-16,Math.min(16,y));
+  // Резкие ступенчатые движения: новая позиция раз в 70–120 мс, без плавного синуса.
+  if(now>=aiMotionTime){
+   aiMotionTime=now+70+Math.random()*50;
+   const strength=(.48+drive*.52)*motionAmount;
+   const nextX=(Math.random()*2-1)*32*strength;
+   const nextY=(Math.random()*2-1)*13*strength;
+   head.x=Math.round(Math.max(-32,Math.min(32,nextX))/4)*4;
+   head.y=Math.round(Math.max(-13,Math.min(13,nextY))/4)*4;
+  }
  }else{head.x*=.9;head.y*=.9}
- if(now>aiMotionTime){
-  aiMotionTime=now+240+Math.random()*380;
+ if(now>aiExpressionTime){
+  aiExpressionTime=now+240+Math.random()*380;
   if(playing&&Math.random()<.14){stable=Math.random()<.62?"brows":"surprised";aiMouthUntil=now+80}
  }
  if(now>aiMouthUntil){
@@ -750,8 +756,17 @@ async function initCamera(){
  setStatus("ASK CAMERA");
  const videoSettings={width:{ideal:1280},height:{ideal:720},facingMode:"user"};
 
- // Сначала запускаем только видео: отказ микрофона больше не блокирует камеру.
- stream=await navigator.mediaDevices.getUserMedia({video:videoSettings,audio:false});
+ // Единый запрос надёжнее сохраняет пользовательский жест в Safari/Chrome.
+ // Если микрофон недоступен, камера всё равно запускается отдельным запасным запросом.
+ let requestedStream;
+ try{
+  requestedStream=await navigator.mediaDevices.getUserMedia({video:videoSettings,audio:AUDIO_SETTINGS});
+ }catch(combinedError){
+  console.warn("Camera + microphone unavailable; retrying camera only",combinedError);
+  requestedStream=await navigator.mediaDevices.getUserMedia({video:videoSettings,audio:false});
+ }
+ stream=new MediaStream(requestedStream.getVideoTracks());
+ micStream=new MediaStream(requestedStream.getAudioTracks());
 
  video.srcObject=stream;
  await video.play();
@@ -759,10 +774,9 @@ async function initCamera(){
  el.showCam.checked=true;
  video.classList.add("visible");
 
- try{
+ if(liveMicrophoneTrack()){
   await ensureMicrophone();
- }catch(micError){
-  console.warn("Microphone unavailable; continuing with camera only",micError);
+ }else{
   warn("КАМЕРА РАБОТАЕТ, НО МИКРОФОН НЕДОСТУПЕН. ЗАПИСЬ БУДЕТ БЕЗ ЗВУКА.");
  }
 }
@@ -785,7 +799,18 @@ async function ensureMicrophone(){
  await audioCtx.resume();
  if(newStream||!recorderAudioDestination){
   const source=audioCtx.createMediaStreamSource(micStream);
-  await buildVoiceGraph(source);
+  try{
+   await buildVoiceGraph(source);
+  }catch(graphError){
+   // Запись сырого микрофона продолжает работать, даже если голосовой эффект недоступен.
+   console.warn("Voice graph unavailable; using raw microphone",graphError);
+   recorderAudioDestination=null;
+   analyser=audioCtx.createAnalyser();analyser.fftSize=512;
+   audioData=new Uint8Array(analyser.frequencyBinCount);
+   micAnalyser=analyser;micAudioData=audioData;
+   const keepAlive=audioCtx.createGain();keepAlive.gain.value=0;
+   source.connect(analyser);analyser.connect(keepAlive);keepAlive.connect(audioCtx.destination);
+  }
  }
  return true;
 }
@@ -893,7 +918,11 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  const settings=exportSettings();
  const videoStream=recCanvas.captureStream(30);
- const audioTracks=audioTracksOverride||(recorderAudioDestination?recorderAudioDestination.stream.getAudioTracks():(micStream?micStream.getAudioTracks():[]));
+ // Обычный REC пишет исходный трек микрофона — это самый совместимый вариант.
+ // REC AI передаёт сюда отдельный синтезированный аудиотрек через audioTracksOverride.
+ const audioTracks=audioTracksOverride!==null
+  ?audioTracksOverride
+  :(micStream?micStream.getAudioTracks().filter(track=>track.readyState==="live"):[]);
 
  if(!audioTracks.length){
   warn("MICROPHONE TRACK NOT FOUND. VIDEO WILL BE RECORDED WITHOUT AUDIO.");
