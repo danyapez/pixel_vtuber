@@ -186,7 +186,7 @@ let micAnalyser=null,micAudioData=null;
 let recorderAudioDestination=null,voiceDryGain=null,voiceFxGain=null,pitchNode=null;
 let voiceFxEnabled=true,pitchWorkletReady=false;
 let teleprompterActive=false,teleprompterSpeakingUntil=0,teleprompterLastFrame=0,teleprompterManualUntil=0;
-let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0;
+let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiRobotOscillator=null,aiStopRequested=false,aiMotionTime=0,aiMouthUntil=0;
 let aiEnvelope=null,aiEnvelopeStep=.02,aiLastEnergy=0,aiProcessingLatency=0;
 let aiSourceStartAt=0,aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTeleprompterWords=[],aiTeleprompterWeights=[],aiTeleprompterTotalWeight=0,aiTeleprompterWordIndex=-1;
 let aiMutedMicTracks=[],audioSessionBeforeAI=null;
@@ -511,14 +511,26 @@ async function buildAIVoiceGraph(source){
  const echo1Delay=audioCtx.createDelay(.12);echo1Delay.delayTime.value=.046;
  const echo1HP=audioCtx.createBiquadFilter();echo1HP.type="highpass";echo1HP.frequency.value=180;echo1HP.Q.value=.65;
  const echo1LP=audioCtx.createBiquadFilter();echo1LP.type="lowpass";echo1LP.frequency.value=5200;echo1LP.Q.value=.7;
- const echo1Gain=audioCtx.createGain();echo1Gain.gain.value=.34;
+ const echo1Gain=audioCtx.createGain();echo1Gain.gain.value=.52;
  voiceTap.connect(echo1Delay);echo1Delay.connect(echo1HP);echo1HP.connect(echo1LP);echo1LP.connect(echo1Gain);echo1Gain.connect(fxSum);
 
  const echo2Delay=audioCtx.createDelay(.08);echo2Delay.delayTime.value=.046;
  const echo2HP=audioCtx.createBiquadFilter();echo2HP.type="highpass";echo2HP.frequency.value=260;echo2HP.Q.value=.7;
  const echo2LP=audioCtx.createBiquadFilter();echo2LP.type="lowpass";echo2LP.frequency.value=3800;echo2LP.Q.value=.75;
- const echo2Gain=audioCtx.createGain();echo2Gain.gain.value=.12;
+ const echo2Gain=audioCtx.createGain();echo2Gain.gain.value=.23;
  echo1Delay.connect(echo2Delay);echo2Delay.connect(echo2HP);echo2HP.connect(echo2LP);echo2LP.connect(echo2Gain);echo2Gain.connect(fxSum);
+
+ // Clearly audible metallic computer layer mixed underneath the natural voice.
+ const robotMod=audioCtx.createGain();robotMod.gain.value=0;
+ const robotDepth=audioCtx.createGain();robotDepth.gain.value=1;
+ aiRobotOscillator=audioCtx.createOscillator();aiRobotOscillator.type="sine";aiRobotOscillator.frequency.value=46;
+ aiRobotOscillator.connect(robotDepth);robotDepth.connect(robotMod.gain);aiRobotOscillator.start();
+ const robotHP=audioCtx.createBiquadFilter();robotHP.type="highpass";robotHP.frequency.value=360;robotHP.Q.value=.7;
+ const robotDrive=audioCtx.createWaveShaper();robotDrive.curve=makeDriveCurve(3.2);robotDrive.oversample="4x";
+ const robotLP=audioCtx.createBiquadFilter();robotLP.type="lowpass";robotLP.frequency.value=4800;robotLP.Q.value=.72;
+ const robotDelay=audioCtx.createDelay(.03);robotDelay.delayTime.value=.0065;
+ const robotGain=audioCtx.createGain();robotGain.gain.value=.52;
+ voiceTap.connect(robotMod);robotMod.connect(robotHP);robotHP.connect(robotDrive);robotDrive.connect(robotLP);robotLP.connect(robotDelay);robotDelay.connect(robotGain);robotGain.connect(fxSum);
 
  const radioCut=audioCtx.createBiquadFilter();radioCut.type="lowpass";radioCut.frequency.value=14000;radioCut.Q.value=.7;
  const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-4;limiter.knee.value=2;limiter.ratio.value=10;limiter.attack.value=.002;limiter.release.value=.075;
@@ -530,6 +542,7 @@ async function buildAIVoiceGraph(source){
 
 function finishAI(){
  restoreAISpeakerOutput();
+ if(aiRobotOscillator){try{aiRobotOscillator.stop()}catch(error){}try{aiRobotOscillator.disconnect()}catch(error){}aiRobotOscillator=null}
  aiMode=false;aiStopRequested=false;aiAudioSource=null;
  aiEnvelope=null;aiLastEnergy=0;aiProcessingLatency=0;
  aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;
