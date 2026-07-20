@@ -511,21 +511,14 @@ async function buildAIVoiceGraph(source){
  const echo1Delay=audioCtx.createDelay(.12);echo1Delay.delayTime.value=.046;
  const echo1HP=audioCtx.createBiquadFilter();echo1HP.type="highpass";echo1HP.frequency.value=280;echo1HP.Q.value=.65;
  const echo1LP=audioCtx.createBiquadFilter();echo1LP.type="lowpass";echo1LP.frequency.value=3800;echo1LP.Q.value=.7;
- const echo1Gain=audioCtx.createGain();echo1Gain.gain.value=.14;
+ const echo1Gain=audioCtx.createGain();echo1Gain.gain.value=.23;
  voiceTap.connect(echo1Delay);echo1Delay.connect(echo1HP);echo1HP.connect(echo1LP);echo1LP.connect(echo1Gain);echo1Gain.connect(fxSum);
 
  const echo2Delay=audioCtx.createDelay(.08);echo2Delay.delayTime.value=.046;
  const echo2HP=audioCtx.createBiquadFilter();echo2HP.type="highpass";echo2HP.frequency.value=420;echo2HP.Q.value=.7;
  const echo2LP=audioCtx.createBiquadFilter();echo2LP.type="lowpass";echo2LP.frequency.value=2800;echo2LP.Q.value=.75;
- const echo2Gain=audioCtx.createGain();echo2Gain.gain.value=.035;
+ const echo2Gain=audioCtx.createGain();echo2Gain.gain.value=.075;
  echo1Delay.connect(echo2Delay);echo2Delay.connect(echo2HP);echo2HP.connect(echo2LP);echo2LP.connect(echo2Gain);echo2Gain.connect(fxSum);
-
- // A quiet, narrow micro-delay restores the subtle computer-character colour
- // without changing Florian's pitch or making the main voice sound synthetic.
- const robotBand=audioCtx.createBiquadFilter();robotBand.type="bandpass";robotBand.frequency.value=2250;robotBand.Q.value=1.25;
- const robotDelay=audioCtx.createDelay(.03);robotDelay.delayTime.value=.0048;
- const robotGain=audioCtx.createGain();robotGain.gain.value=.04;
- voiceTap.connect(robotBand);robotBand.connect(robotDelay);robotDelay.connect(robotGain);robotGain.connect(fxSum);
 
  const radioCut=audioCtx.createBiquadFilter();radioCut.type="lowpass";radioCut.frequency.value=14000;radioCut.Q.value=.7;
  const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-4;limiter.knee.value=2;limiter.ratio.value=10;limiter.attack.value=.002;limiter.release.value=.075;
