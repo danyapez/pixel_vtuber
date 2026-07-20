@@ -284,7 +284,8 @@ function updateHead(result){
 // Регулятор плавности по-прежнему работает: 0% — резко, 96% — очень мягко.
 function advanceHead(now){
  if(now<nextHeadStep)return;
- nextHeadStep=now+45;
+ // AI обновляется каждый кадр для непрерывной траектории; камера остаётся пиксельной.
+ nextHeadStep=now+(aiMode?16:45);
  const retention=Math.min(.96,Math.max(0,Number(el.smooth.value)/100));
  const step=4;
  const targetX=Math.round(head.x/step)*step;
@@ -650,18 +651,13 @@ function updateAIMotion(now,vol){
   energy=Math.max(aiEnvelope[Math.max(0,frame-1)]||0,aiEnvelope[frame]||0,aiEnvelope[Math.min(aiEnvelope.length-1,frame+1)]||0);
  }
  aiLastEnergy=aiLastEnergy*.45+energy*.55;
- const drive=playing?Math.min(1,.25+aiLastEnergy):0;
+ const t=Math.max(0,elapsed),drive=playing?Math.min(1,.25+aiLastEnergy):0;
  const motionAmount=Math.max(0,Math.min(1,Number(el.move.value)/220));
  if(playing){
-  // Резкие ступенчатые движения: новая позиция раз в 70–120 мс, без плавного синуса.
-  if(now>=aiMotionTime){
-   aiMotionTime=now+70+Math.random()*50;
-   const strength=(.48+drive*.52)*motionAmount;
-   const nextX=(Math.random()*2-1)*32*strength;
-   const nextY=(Math.random()*2-1)*13*strength;
-   head.x=Math.round(Math.max(-32,Math.min(32,nextX))/4)*4;
-   head.y=Math.round(Math.max(-13,Math.min(13,nextY))/4)*4;
-  }
+  // Быстрое непрерывное движение из стороны в сторону без случайных рывков.
+  const speechStrength=.72+drive*.28;
+  head.x=Math.sin(t*3.9)*28*speechStrength*motionAmount;
+  head.y=Math.sin(t*7.8+.6)*4.5*drive*motionAmount;
  }else{head.x*=.9;head.y*=.9}
  if(now>aiExpressionTime){
   aiExpressionTime=now+240+Math.random()*380;
