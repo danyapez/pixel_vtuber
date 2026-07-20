@@ -436,61 +436,53 @@ async function buildVoiceGraph(source){
  setVoiceFxEnabled(voiceFxEnabled);setVoiceDepth(el.voiceDepth.value);
 }
 
-const EDGE_TTS_TOKEN="6A5AA1D4EAFF4E9FB37E23D68491D6F4";
-const EDGE_TTS_VERSION="1-143.0.3650.75";
+const EDGE_TTS_API="https://innoai-edge-tts-text-to-speech.hf.space/gradio_api/call/tts_interface";
 const EDGE_TTS_VOICE="de-DE-FlorianMultilingualNeural";
 
-function edgeTTSId(){return crypto.randomUUID().replaceAll("-","")}
-function edgeTTSDate(){
- const date=new Date(),days=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
- const pad=value=>String(value).padStart(2,"0");
- return `${days[date.getUTCDay()]} ${months[date.getUTCMonth()]} ${pad(date.getUTCDate())} ${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} GMT+0000 (Coordinated Universal Time)`;
+const edgeTTSWait=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds));
+
+async function edgeTTSFetch(url,options={},attempts=3){
+ let lastError;
+ for(let attempt=0;attempt<attempts;attempt++){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
+  try{
+   const response=await fetch(url,{...options,signal:controller.signal});
+   clearTimeout(timer);
+   if(response.ok)return response;
+   lastError=new Error("AI VOICE SERVER "+response.status);
+  }catch(error){clearTimeout(timer);lastError=error}
+  if(attempt<attempts-1)await edgeTTSWait(1800+attempt*2200);
+ }
+ throw lastError||new Error("AI VOICE NETWORK ERROR");
 }
-async function edgeTTSGec(){
- const epoch=11644473600n;
- let seconds=BigInt(Math.floor(Date.now()/1000));seconds-=seconds%300n;
- const value=((seconds+epoch)*10000000n).toString()+EDGE_TTS_TOKEN;
- const hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
- return [...new Uint8Array(hash)].map(value=>value.toString(16).padStart(2,"0")).join("").toUpperCase();
-}
-function edgeTTSEscape(text){return text.replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[char]))}
 
 async function synthesizeText(text){
- const connection=edgeTTSId(),gec=await edgeTTSGec();
- const url=`wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_TTS_TOKEN}&ConnectionId=${connection}&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=${EDGE_TTS_VERSION}`;
- return new Promise((resolve,reject)=>{
-  const socket=new WebSocket(url),chunks=[];let settled=false;
-  socket.binaryType="arraybuffer";
-  const timer=setTimeout(()=>finish(new Error("AI VOICE TIMEOUT")),90000);
-  const finish=async error=>{
-   if(settled)return;settled=true;clearTimeout(timer);try{socket.close()}catch(_){}
-   if(error){reject(error);return}
-   try{
-    const mp3=await new Blob(chunks,{type:"audio/mpeg"}).arrayBuffer();
-    const decoded=await audioCtx.decodeAudioData(mp3.slice(0));
-    const samples=new Float32Array(decoded.length);
-    if(decoded.numberOfChannels===1)samples.set(decoded.getChannelData(0));
-    else for(let channel=0;channel<decoded.numberOfChannels;channel++){const data=decoded.getChannelData(channel);for(let i=0;i<data.length;i++)samples[i]+=data[i]/decoded.numberOfChannels}
-    resolve({samples,sampleRate:decoded.sampleRate});
-   }catch(decodeError){reject(new Error("AI VOICE DECODE ERROR: "+decodeError.message))}
-  };
-  socket.onopen=()=>{
-   socket.send(`X-Timestamp:${edgeTTSDate()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n`);
-   const ssml=`<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='ru-RU'><voice name='${EDGE_TTS_VOICE}'><prosody pitch='+3Hz' rate='+2%' volume='+0%'>${edgeTTSEscape(text)}</prosody></voice></speak>`;
-   socket.send(`X-RequestId:${edgeTTSId()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${edgeTTSDate()}Z\r\nPath:ssml\r\n\r\n${ssml}`);
-  };
-  socket.onmessage=event=>{
-   if(typeof event.data==="string"){
-    if(event.data.includes("Path:turn.end"))finish();
-    return;
-   }
-   const data=event.data;if(!(data instanceof ArrayBuffer)||data.byteLength<3)return;
-   const view=new DataView(data),headerLength=view.getUint16(0,false),audioStart=2+headerLength;
-   if(audioStart<data.byteLength)chunks.push(data.slice(audioStart));
-  };
-  socket.onerror=()=>finish(new Error("AI VOICE NETWORK ERROR"));
-  socket.onclose=event=>{if(!settled)chunks.length?finish():finish(new Error("AI VOICE CONNECTION CLOSED: "+event.code))};
+ const submission=await edgeTTSFetch(EDGE_TTS_API,{
+  method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({data:[text,EDGE_TTS_VOICE,2,3]})
  });
+ const submitted=await submission.json();
+ if(!submitted.event_id)throw new Error("AI VOICE START ERROR");
+
+ const eventResponse=await edgeTTSFetch(`${EDGE_TTS_API}/${submitted.event_id}`,{headers:{Accept:"text/event-stream"}},2);
+ const eventText=await eventResponse.text();
+ if(/event:\s*error/i.test(eventText))throw new Error("AI VOICE SERVER ERROR");
+ const complete=eventText.match(/event:\s*complete\s*[\r\n]+data:\s*(.+)/i);
+ if(!complete)throw new Error("AI VOICE EMPTY RESPONSE");
+ const result=JSON.parse(complete[1]);
+ const audioUrl=result?.[0]?.url;
+ if(!audioUrl)throw new Error("AI VOICE AUDIO NOT FOUND");
+
+ const audioResponse=await edgeTTSFetch(audioUrl,{},2);
+ const mp3=await audioResponse.arrayBuffer();
+ const decoded=await audioCtx.decodeAudioData(mp3.slice(0));
+ const samples=new Float32Array(decoded.length);
+ if(decoded.numberOfChannels===1)samples.set(decoded.getChannelData(0));
+ else for(let channel=0;channel<decoded.numberOfChannels;channel++){
+  const data=decoded.getChannelData(channel);
+  for(let index=0;index<data.length;index++)samples[index]+=data[index]/decoded.numberOfChannels;
+ }
+ return {samples,sampleRate:decoded.sampleRate};
 }
 
 async function buildAIVoiceGraph(source){
