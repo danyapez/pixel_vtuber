@@ -520,6 +520,13 @@ async function buildAIVoiceGraph(source){
  const echo2Gain=audioCtx.createGain();echo2Gain.gain.value=.035;
  echo1Delay.connect(echo2Delay);echo2Delay.connect(echo2HP);echo2HP.connect(echo2LP);echo2LP.connect(echo2Gain);echo2Gain.connect(fxSum);
 
+ // A quiet, narrow micro-delay restores the subtle computer-character colour
+ // without changing Florian's pitch or making the main voice sound synthetic.
+ const robotBand=audioCtx.createBiquadFilter();robotBand.type="bandpass";robotBand.frequency.value=2250;robotBand.Q.value=1.25;
+ const robotDelay=audioCtx.createDelay(.03);robotDelay.delayTime.value=.0048;
+ const robotGain=audioCtx.createGain();robotGain.gain.value=.04;
+ voiceTap.connect(robotBand);robotBand.connect(robotDelay);robotDelay.connect(robotGain);robotGain.connect(fxSum);
+
  const radioCut=audioCtx.createBiquadFilter();radioCut.type="lowpass";radioCut.frequency.value=14000;radioCut.Q.value=.7;
  const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-4;limiter.knee.value=2;limiter.ratio.value=10;limiter.attack.value=.002;limiter.release.value=.075;
  // Match the saved Friday reference instead of the over-compressed loud version.
