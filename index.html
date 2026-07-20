@@ -26,6 +26,8 @@ button:hover:not(:disabled),button:active:not(:disabled),a:hover,select:hover{ba
 button:disabled{opacity:.35;cursor:not-allowed}
 .hidden{display:none!important}
 label{display:grid;gap:8px;color:#fff;font-size:9px;line-height:1.6}
+label .setting-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+label output{color:#7741F6;font-variant-numeric:tabular-nums}
 input[type=range]{width:100%;accent-color:#fff}
 .check{grid-template-columns:18px 1fr;align-items:start}
 input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
@@ -114,16 +116,16 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 
 <div class="block-title">НАСТРОЙКИ</div>
 
-<label>РАЗМЕР
+<label><span class="setting-head"><span>РАЗМЕР</span><output id="scaleValue">1.55×</output></span>
 <input id="scale" type="range" min="0.7" max="2.6" step="0.05" value="1.55">
 </label>
 
-<label>ДВИЖЕНИЕ ГОЛОВЫ
+<label><span class="setting-head"><span>ДВИЖЕНИЕ ГОЛОВЫ</span><output id="moveValue">90</output></span>
 <input id="move" type="range" min="0" max="220" step="1" value="90">
 </label>
 
-<label>ПЛАВНОСТЬ
-<input id="smooth" type="range" min="0" max="96" step="1" value="78">
+<label><span class="setting-head"><span>ПЛАВНОСТЬ</span><output id="smoothValue">24%</output></span>
+<input id="smooth" type="range" min="0" max="96" step="1" value="24">
 </label>
 
 <label class="check">
@@ -165,8 +167,11 @@ const el={
  format:document.querySelector("#format"),
  exportInfo:document.querySelector("#exportInfo"),
  scale:document.querySelector("#scale"),
+ scaleValue:document.querySelector("#scaleValue"),
  move:document.querySelector("#move"),
+ moveValue:document.querySelector("#moveValue"),
  smooth:document.querySelector("#smooth"),
+ smoothValue:document.querySelector("#smoothValue"),
  showCam:document.querySelector("#showCam"),
  voiceFxToggle:document.querySelector("#voiceFxToggle"),
  voiceDepth:document.querySelector("#voiceDepth"),
@@ -194,6 +199,7 @@ let recorder=null, chunks=[], lastVideoTime=-1;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
+let nextHeadStep=0;
 
 let wavSource=null, wavProcessor=null, wavSilentGain=null, wavBuffers=[], wavSampleRate=44100;
 
@@ -273,6 +279,19 @@ function updateHead(result){
  head.y=(nose.y-.5)*power*1.15;
 }
 
+// Пиксельный аватар двигается короткими шагами, а не «плывёт» каждый кадр.
+// Регулятор плавности по-прежнему работает: 0% — резко, 96% — очень мягко.
+function advanceHead(now){
+ if(now<nextHeadStep)return;
+ nextHeadStep=now+45;
+ const retention=Math.min(.96,Math.max(0,Number(el.smooth.value)/100));
+ const step=4;
+ const targetX=Math.round(head.x/step)*step;
+ const targetY=Math.round(head.y/step)*step;
+ smoothHead.x=smoothHead.x*retention+targetX*(1-retention);
+ smoothHead.y=smoothHead.y*retention+targetY*(1-retention);
+}
+
 function render(ctx,w,h,bg){
  ctx.imageSmoothingEnabled=false;
  ctx.fillStyle=bg;
@@ -280,10 +299,6 @@ function render(ctx,w,h,bg){
 
  const sp=sprites[stable]||sprites.static;
  if(!sp)return;
-
- const sm=Number(el.smooth.value)/100;
- smoothHead.x=smoothHead.x*sm+head.x*(1-sm);
- smoothHead.y=smoothHead.y*sm+head.y*(1-sm);
 
  const f=h/1080;
  const sc=Number(el.scale.value)*f;
@@ -296,14 +311,20 @@ function render(ctx,w,h,bg){
 
 async function initFace(){
  if(face)return;
- setStatus("ЗАГРУЗКА");
+ setStatus("ЗАГРУЗКА ТРЕКИНГА");
  const vision=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
- face=await FaceLandmarker.createFromOptions(vision,{
-  baseOptions:{modelAssetPath:MODEL_URL,delegate:"GPU"},
+ const options=delegate=>({
+  baseOptions:{modelAssetPath:MODEL_URL,delegate},
   outputFaceBlendshapes:true,
   runningMode:"VIDEO",
   numFaces:1
  });
+ try{
+  face=await FaceLandmarker.createFromOptions(vision,options("GPU"));
+ }catch(gpuError){
+  console.warn("GPU tracking unavailable, switching to CPU",gpuError);
+  face=await FaceLandmarker.createFromOptions(vision,options("CPU"));
+ }
 }
 
 function makeDriveCurve(amount=1.7){
@@ -722,30 +743,36 @@ async function initCamera(){
  if(!window.isSecureContext)throw new Error("OPEN THROUGH HTTPS OR LOCALHOST");
 
  setStatus("ASK CAMERA");
+ const videoSettings={width:{ideal:1280},height:{ideal:720},facingMode:"user"};
+ const audioSettings={echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:{ideal:44100},channelCount:{ideal:1}};
 
- stream=await navigator.mediaDevices.getUserMedia({
-  video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
-  audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:{ideal:44100},channelCount:{ideal:1}}
- });
+ // Сначала запускаем только видео: отказ микрофона больше не блокирует камеру.
+ stream=await navigator.mediaDevices.getUserMedia({video:videoSettings,audio:false});
 
  video.srcObject=stream;
  await video.play();
-
- micStream=new MediaStream(stream.getAudioTracks());
+ cameraReady=true;
+ el.showCam.checked=true;
+ video.classList.add("visible");
 
  try{
-  audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
- }catch(e){
-  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  micStream=await navigator.mediaDevices.getUserMedia({video:false,audio:audioSettings});
+ }catch(micError){
+  console.warn("Microphone unavailable; continuing with camera only",micError);
+  micStream=new MediaStream();
  }
- await audioCtx.resume();
-
  if(micStream.getAudioTracks().length){
+  try{
+   audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
+  }catch(e){
+   audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  }
+  await audioCtx.resume();
   const source=audioCtx.createMediaStreamSource(micStream);
   await buildVoiceGraph(source);
+ }else{
+  warn("КАМЕРА РАБОТАЕТ, НО МИКРОФОН НЕДОСТУПЕН. ЗАПИСЬ БУДЕТ БЕЗ ЗВУКА.");
  }
-
- cameraReady=true;
 }
 
 function startWavRecord(){
@@ -826,6 +853,7 @@ function loop(){
   head.x*=.96;
   head.y*=.96;
  }
+ advanceHead(now);
  updateTeleprompter(v,now);
 
  render(pctx,preview.width,preview.height,"#000000");
@@ -921,14 +949,28 @@ setVoiceFxEnabled(voiceFxEnabled);setVoiceDepth(el.voiceDepth.value);
 el.voiceFxToggle.onclick=()=>{setVoiceFxEnabled(!voiceFxEnabled);if(audioCtx&&audioCtx.state==="suspended")audioCtx.resume()};
 el.voiceDepth.addEventListener("input",()=>setVoiceDepth(el.voiceDepth.value));
 
+function updateSettingLabels(){
+ el.scaleValue.value=`${Number(el.scale.value).toFixed(2)}×`;
+ el.moveValue.value=el.move.value;
+ el.smoothValue.value=`${el.smooth.value}%`;
+}
+[el.scale,el.move,el.smooth].forEach(input=>input.addEventListener("input",updateSettingLabels));
+updateSettingLabels();
+
 el.start.onclick=async()=>{
  try{
   el.start.disabled=true;
   hideWarn();
-  await loadSprites();
-  await initFace();
   await initCamera();
   setStatus("CAMERA ON");
+  try{
+   await initFace();
+   setStatus("TRACKING ON");
+  }catch(trackingError){
+   console.error(trackingError);
+   setStatus("CAMERA ONLY");
+   warn("КАМЕРА ВКЛЮЧЕНА, НО ТРЕКИНГ ЛИЦА НЕ ЗАГРУЗИЛСЯ. ПРОВЕРЬТЕ ИНТЕРНЕТ И ОБНОВИТЕ СТРАНИЦУ.");
+  }
  }catch(e){
   console.error(e);
   el.start.disabled=false;
