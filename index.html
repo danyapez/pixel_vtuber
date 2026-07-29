@@ -513,22 +513,65 @@ async function synthesizeText(text){
  return {samples,sampleRate:decoded.sampleRate};
 }
 
+async function renderAIVoiceOffline(samples,sampleRate){
+ const OfflineContext=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+ if(!OfflineContext)throw new Error("OFFLINE AI AUDIO IS NOT SUPPORTED IN THIS BROWSER");
+ const inputDuration=samples.length/sampleRate;
+ const offline=new OfflineContext(1,Math.ceil((inputDuration+.24)*AUDIO_SAMPLE_RATE),AUDIO_SAMPLE_RATE);
+ const inputBuffer=offline.createBuffer(1,samples.length,sampleRate);
+ inputBuffer.getChannelData(0).set(samples);
+ const source=offline.createBufferSource();source.buffer=inputBuffer;
+
+ // Те же AI-эффекты, но они считаются заранее и не могут заикаться во время записи.
+ const hp=offline.createBiquadFilter();hp.type="highpass";hp.frequency.value=92;hp.Q.value=.7;
+ const body=offline.createBiquadFilter();body.type="peaking";body.frequency.value=190;body.Q.value=.78;body.gain.value=.4;
+ const mud=offline.createBiquadFilter();mud.type="peaking";mud.frequency.value=340;mud.Q.value=1;mud.gain.value=-2.6;
+ const announcer=offline.createBiquadFilter();announcer.type="peaking";announcer.frequency.value=1850;announcer.Q.value=.82;announcer.gain.value=2.6;
+ const presence=offline.createBiquadFilter();presence.type="peaking";presence.frequency.value=4200;presence.Q.value=.86;presence.gain.value=3.1;
+ const grit=offline.createWaveShaper();grit.curve=makeDriveCurve(.72);grit.oversample="4x";
+ const fxSum=offline.createGain(),mainGain=offline.createGain();mainGain.gain.value=.98;
+ source.connect(hp);hp.connect(body);body.connect(mud);mud.connect(announcer);announcer.connect(presence);presence.connect(grit);
+ grit.connect(mainGain);mainGain.connect(fxSum);
+
+ const echo1Delay=offline.createDelay(.12);echo1Delay.delayTime.value=.046;
+ const echo1HP=offline.createBiquadFilter();echo1HP.type="highpass";echo1HP.frequency.value=180;echo1HP.Q.value=.65;
+ const echo1LP=offline.createBiquadFilter();echo1LP.type="lowpass";echo1LP.frequency.value=5200;echo1LP.Q.value=.7;
+ const echo1Gain=offline.createGain();echo1Gain.gain.value=.42;
+ grit.connect(echo1Delay);echo1Delay.connect(echo1HP);echo1HP.connect(echo1LP);echo1LP.connect(echo1Gain);echo1Gain.connect(fxSum);
+
+ const echo2Delay=offline.createDelay(.08);echo2Delay.delayTime.value=.046;
+ const echo2HP=offline.createBiquadFilter();echo2HP.type="highpass";echo2HP.frequency.value=260;echo2HP.Q.value=.7;
+ const echo2LP=offline.createBiquadFilter();echo2LP.type="lowpass";echo2LP.frequency.value=3800;echo2LP.Q.value=.75;
+ const echo2Gain=offline.createGain();echo2Gain.gain.value=.17;
+ echo1Delay.connect(echo2Delay);echo2Delay.connect(echo2HP);echo2HP.connect(echo2LP);echo2LP.connect(echo2Gain);echo2Gain.connect(fxSum);
+
+ const robotMod=offline.createGain();robotMod.gain.value=0;
+ const robotDepth=offline.createGain();robotDepth.gain.value=1;
+ const robotOscillator=offline.createOscillator();robotOscillator.type="sine";robotOscillator.frequency.value=46;
+ robotOscillator.connect(robotDepth);robotDepth.connect(robotMod.gain);
+ const robotHP=offline.createBiquadFilter();robotHP.type="highpass";robotHP.frequency.value=360;robotHP.Q.value=.7;
+ const robotDrive=offline.createWaveShaper();robotDrive.curve=makeDriveCurve(2.6);robotDrive.oversample="4x";
+ const robotLP=offline.createBiquadFilter();robotLP.type="lowpass";robotLP.frequency.value=4800;robotLP.Q.value=.72;
+ const robotDelay=offline.createDelay(.03);robotDelay.delayTime.value=.0065;
+ const robotGain=offline.createGain();robotGain.gain.value=.32;
+ grit.connect(robotMod);robotMod.connect(robotHP);robotHP.connect(robotDrive);robotDrive.connect(robotLP);robotLP.connect(robotDelay);robotDelay.connect(robotGain);robotGain.connect(fxSum);
+
+ const radioCut=offline.createBiquadFilter();radioCut.type="lowpass";radioCut.frequency.value=14000;radioCut.Q.value=.7;
+ const limiter=offline.createDynamicsCompressor();limiter.threshold.value=-4;limiter.knee.value=2;limiter.ratio.value=10;limiter.attack.value=.002;limiter.release.value=.075;
+ const master=offline.createGain();master.gain.value=.53;
+ fxSum.connect(radioCut);radioCut.connect(limiter);limiter.connect(master);master.connect(offline.destination);
+
+ source.start(0);robotOscillator.start(0);robotOscillator.stop(inputDuration+.24);
+ const rendered=await offline.startRendering();
+ return {samples:new Float32Array(rendered.getChannelData(0)),sampleRate:rendered.sampleRate};
+}
+
 async function buildAIVoiceGraph(source){
  aiRecordingDestination=audioCtx.createMediaStreamDestination();
  analyser=audioCtx.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=.7;
  audioData=new Uint8Array(analyser.frequencyBinCount);
-
- // Стабильная цепочка для CapCut: без realtime-эхо, робот-модуляции и тяжёлых waveshaper.
- const hp=audioCtx.createBiquadFilter();hp.type="highpass";hp.frequency.value=75;hp.Q.value=.7;
- const presence=audioCtx.createBiquadFilter();presence.type="peaking";presence.frequency.value=2600;presence.Q.value=.8;presence.gain.value=1.8;
- const lp=audioCtx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=15500;lp.Q.value=.7;
- const compressor=audioCtx.createDynamicsCompressor();
- compressor.threshold.value=-20;compressor.knee.value=14;compressor.ratio.value=3;
- compressor.attack.value=.006;compressor.release.value=.14;
- const master=audioCtx.createGain();master.gain.value=.82;
-
- source.connect(hp);hp.connect(presence);presence.connect(lp);lp.connect(compressor);compressor.connect(master);
- master.connect(analyser);analyser.connect(aiRecordingDestination);analyser.connect(audioCtx.destination);
+ // Здесь уже готовый звук со всеми эффектами — только воспроизведение и запись.
+ source.connect(analyser);analyser.connect(aiRecordingDestination);analyser.connect(audioCtx.destination);
  aiProcessingLatency=0;
 }
 
@@ -587,9 +630,11 @@ async function startAIRecording(){
  await audioCtx.resume();
 
  const result=await synthesizeText(text);
- aiEnvelope=buildAIEnvelope(result.samples,result.sampleRate);
- const buffer=audioCtx.createBuffer(1,result.samples.length,result.sampleRate);
- buffer.getChannelData(0).set(result.samples);
+ setStatus("ОБРАБОТКА AI");
+ const processed=await renderAIVoiceOffline(result.samples,result.sampleRate);
+ aiEnvelope=buildAIEnvelope(processed.samples,processed.sampleRate);
+ const buffer=audioCtx.createBuffer(1,processed.samples.length,processed.sampleRate);
+ buffer.getChannelData(0).set(processed.samples);
  aiAudioSource=audioCtx.createBufferSource();aiAudioSource.buffer=buffer;
  await buildAIVoiceGraph(aiAudioSource);
 
