@@ -518,52 +518,18 @@ async function buildAIVoiceGraph(source){
  analyser=audioCtx.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=.7;
  audioData=new Uint8Array(analyser.frequencyBinCount);
 
- const hp=audioCtx.createBiquadFilter();hp.type="highpass";hp.frequency.value=92;hp.Q.value=.7;
- const body=audioCtx.createBiquadFilter();body.type="peaking";body.frequency.value=190;body.Q.value=.78;body.gain.value=.4;
- const mud=audioCtx.createBiquadFilter();mud.type="peaking";mud.frequency.value=340;mud.Q.value=1;mud.gain.value=-2.6;
- const announcer=audioCtx.createBiquadFilter();announcer.type="peaking";announcer.frequency.value=1850;announcer.Q.value=.82;announcer.gain.value=2.6;
- const presence=audioCtx.createBiquadFilter();presence.type="peaking";presence.frequency.value=4200;presence.Q.value=.86;presence.gain.value=3.1;
- const compressor=audioCtx.createDynamicsCompressor();compressor.threshold.value=-21;compressor.knee.value=12;compressor.ratio.value=3.2;compressor.attack.value=.003;compressor.release.value=.07;
- const grit=audioCtx.createWaveShaper();grit.curve=makeDriveCurve(.72);grit.oversample="2x";
- const fxSum=audioCtx.createGain(),mainGain=audioCtx.createGain();mainGain.gain.value=.98;
+ // Стабильная цепочка для CapCut: без realtime-эхо, робот-модуляции и тяжёлых waveshaper.
+ const hp=audioCtx.createBiquadFilter();hp.type="highpass";hp.frequency.value=75;hp.Q.value=.7;
+ const presence=audioCtx.createBiquadFilter();presence.type="peaking";presence.frequency.value=2600;presence.Q.value=.8;presence.gain.value=1.8;
+ const lp=audioCtx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=15500;lp.Q.value=.7;
+ const compressor=audioCtx.createDynamicsCompressor();
+ compressor.threshold.value=-20;compressor.knee.value=14;compressor.ratio.value=3;
+ compressor.attack.value=.006;compressor.release.value=.14;
+ const master=audioCtx.createGain();master.gain.value=.82;
 
- // AI pitch is already produced by Edge TTS. Running it through the browser
- // pitch shifter again raised Florian far above the measured 164–165 Hz target.
- source.connect(hp);hp.connect(body);body.connect(mud);mud.connect(announcer);announcer.connect(presence);presence.connect(grit);
-
- let voiceTap=grit;aiProcessingLatency=0;
- voiceTap.connect(mainGain);mainGain.connect(fxSum);
-
- const echo1Delay=audioCtx.createDelay(.12);echo1Delay.delayTime.value=.046;
- const echo1HP=audioCtx.createBiquadFilter();echo1HP.type="highpass";echo1HP.frequency.value=180;echo1HP.Q.value=.65;
- const echo1LP=audioCtx.createBiquadFilter();echo1LP.type="lowpass";echo1LP.frequency.value=5200;echo1LP.Q.value=.7;
- const echo1Gain=audioCtx.createGain();echo1Gain.gain.value=.42;
- voiceTap.connect(echo1Delay);echo1Delay.connect(echo1HP);echo1HP.connect(echo1LP);echo1LP.connect(echo1Gain);echo1Gain.connect(fxSum);
-
- const echo2Delay=audioCtx.createDelay(.08);echo2Delay.delayTime.value=.046;
- const echo2HP=audioCtx.createBiquadFilter();echo2HP.type="highpass";echo2HP.frequency.value=260;echo2HP.Q.value=.7;
- const echo2LP=audioCtx.createBiquadFilter();echo2LP.type="lowpass";echo2LP.frequency.value=3800;echo2LP.Q.value=.75;
- const echo2Gain=audioCtx.createGain();echo2Gain.gain.value=.17;
- echo1Delay.connect(echo2Delay);echo2Delay.connect(echo2HP);echo2HP.connect(echo2LP);echo2LP.connect(echo2Gain);echo2Gain.connect(fxSum);
-
- // Clearly audible metallic computer layer mixed underneath the natural voice.
- const robotMod=audioCtx.createGain();robotMod.gain.value=0;
- const robotDepth=audioCtx.createGain();robotDepth.gain.value=1;
- aiRobotOscillator=audioCtx.createOscillator();aiRobotOscillator.type="sine";aiRobotOscillator.frequency.value=46;
- aiRobotOscillator.connect(robotDepth);robotDepth.connect(robotMod.gain);aiRobotOscillator.start();
- const robotHP=audioCtx.createBiquadFilter();robotHP.type="highpass";robotHP.frequency.value=360;robotHP.Q.value=.7;
- const robotDrive=audioCtx.createWaveShaper();robotDrive.curve=makeDriveCurve(2.6);robotDrive.oversample="2x";
- const robotLP=audioCtx.createBiquadFilter();robotLP.type="lowpass";robotLP.frequency.value=4800;robotLP.Q.value=.72;
- const robotDelay=audioCtx.createDelay(.03);robotDelay.delayTime.value=.0065;
- const robotGain=audioCtx.createGain();robotGain.gain.value=.32;
- voiceTap.connect(robotMod);robotMod.connect(robotHP);robotHP.connect(robotDrive);robotDrive.connect(robotLP);robotLP.connect(robotDelay);robotDelay.connect(robotGain);robotGain.connect(fxSum);
-
- const radioCut=audioCtx.createBiquadFilter();radioCut.type="lowpass";radioCut.frequency.value=14000;radioCut.Q.value=.7;
- const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-4;limiter.knee.value=2;limiter.ratio.value=10;limiter.attack.value=.002;limiter.release.value=.075;
- // Match the saved Friday reference instead of the over-compressed loud version.
- const master=audioCtx.createGain();master.gain.value=.53;
- fxSum.connect(radioCut);radioCut.connect(limiter);limiter.connect(master);
- master.connect(analyser);master.connect(aiRecordingDestination);master.connect(audioCtx.destination);
+ source.connect(hp);hp.connect(presence);presence.connect(lp);lp.connect(compressor);compressor.connect(master);
+ master.connect(analyser);analyser.connect(aiRecordingDestination);analyser.connect(audioCtx.destination);
+ aiProcessingLatency=0;
 }
 
 function finishAI(){
@@ -964,9 +930,8 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   setStatus("READY");
  };
 
- // Потоковые блоки нужны Safari/Chrome для надёжной аудиодорожки.
- // 4 секунды уменьшают количество MP4-фрагментов без риска получить видео без звука.
- recorder.start(4000);
+ // Исходный надёжный режим MediaRecorder: звук регулярно сбрасывается в MP4.
+ recorder.start(1000);
  if(el.teleprompterInput.value.trim())openTeleprompter(true);
 
  el.format.textContent="MP4";
