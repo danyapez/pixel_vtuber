@@ -928,7 +928,6 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
  const audioTracks=audioTracksOverride!==null
   ?audioTracksOverride
   :(micStream?micStream.getAudioTracks().filter(track=>track.readyState==="live"):[]);
- for(const track of audioTracks){try{track.contentHint="speech"}catch(_){}}
 
  if(!audioTracks.length){
   warn("MICROPHONE TRACK NOT FOUND. VIDEO WILL BE RECORDED WITHOUT AUDIO.");
@@ -965,8 +964,9 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   setStatus("READY");
  };
 
- // Один цельный медиасегмент: CapCut хуже декодирует MP4, разбитый браузером каждую секунду.
- recorder.start();
+ // Потоковые блоки нужны Safari/Chrome для надёжной аудиодорожки.
+ // 4 секунды уменьшают количество MP4-фрагментов без риска получить видео без звука.
+ recorder.start(4000);
  if(el.teleprompterInput.value.trim())openTeleprompter(true);
 
  el.format.textContent="MP4";
