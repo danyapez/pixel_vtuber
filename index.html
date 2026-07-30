@@ -132,8 +132,9 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <input id="showCam" type="checkbox"><span>ПОКАЗАТЬ КАМЕРУ</span>
 </label>
 
+<div class="status">СТАТУС: <span id="status">WAIT</span></div>
+
 <div class="hidden">
-  <span id="status">WAIT</span>
   <span id="sprite">STATIC</span>
   <span id="exportInfo">1920×1080</span>
   <span id="format">MP4</span>
@@ -743,8 +744,16 @@ function updateTeleprompter(vol,now){
   const elapsed=audioCtx.currentTime-aiTeleprompterStartAt;
   const progress=Math.max(0,Math.min(1,elapsed/aiTeleprompterDuration));
   const speaking=elapsed>=0&&progress<1;
+  const elapsedSeconds=Math.max(0,Math.min(Math.ceil(aiTeleprompterDuration),Math.floor(elapsed)));
+  const totalSeconds=Math.max(1,Math.ceil(aiTeleprompterDuration));
+  const percent=Math.round(progress*100);
   el.teleprompterReader.classList.toggle("speaking",speaking);
-  el.teleprompterState.textContent=elapsed<0?"AI • СТАРТ":progress>=1?"КОНЕЦ":`AI • ${Math.round(progress*100)}%`;
+  el.teleprompterState.textContent=elapsed<0
+   ?`AI • СТАРТ • 0/${totalSeconds} СЕК`
+   :progress>=1
+    ?`КОНЕЦ • ${totalSeconds}/${totalSeconds} СЕК`
+    :`AI • ${percent}% • ${elapsedSeconds}/${totalSeconds} СЕК`;
+  setStatus(`REC AI • ${percent}% • ${elapsedSeconds}/${totalSeconds} СЕК`);
   updateAITeleprompterProgress(progress);
   return;
  }
@@ -919,6 +928,47 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
+async function makeCapCutCompatible(rawBlob){
+ let mediaTools;
+ try{
+  mediaTools=await import("https://cdn.jsdelivr.net/npm/mediabunny@1.51.0/+esm");
+ }catch(primaryCdnError){
+  console.warn("Primary CapCut encoder CDN unavailable",primaryCdnError);
+  mediaTools=await import("https://esm.sh/mediabunny@1.51.0");
+ }
+ const {
+  Input,Output,BlobSource,BufferTarget,ALL_FORMATS,Mp4OutputFormat,Conversion
+ }=mediaTools;
+
+ const input=new Input({source:new BlobSource(rawBlob),formats:ALL_FORMATS});
+ const recordedDuration=await input.computeDuration();
+ const [inputVideoTrack,inputAudioTrack]=await Promise.all([
+  input.getPrimaryVideoTrack(),input.getPrimaryAudioTrack()
+ ]);
+ if(!inputVideoTrack)throw new Error("RECORDED VIDEO TRACK IS MISSING");
+ if(!inputAudioTrack)throw new Error("RECORDED AI AUDIO TRACK IS MISSING");
+ const target=new BufferTarget();
+ const output=new Output({format:new Mp4OutputFormat(),target});
+ const conversion=await Conversion.init({
+  input,output,tracks:"primary",tags:{},
+  video:{
+   codec:"avc",frameRate:30,bitrate:12000000,keyFrameInterval:2,
+   forceTranscode:true,hardwareAcceleration:"prefer-hardware"
+  },
+  audio:{
+   codec:"aac",sampleRate:AUDIO_SAMPLE_RATE,numberOfChannels:1,
+   bitrate:192000,forceTranscode:true
+  }
+ });
+ if(!conversion.isValid)throw new Error("CAPCUT ENCODER IS NOT SUPPORTED");
+ if(!conversion.utilizedTracks.includes(inputVideoTrack))throw new Error("CAPCUT VIDEO TRACK WAS DISCARDED");
+ if(!conversion.utilizedTracks.includes(inputAudioTrack))throw new Error("CAPCUT AUDIO TRACK WAS DISCARDED");
+ conversion.onProgress=progress=>setStatus(`CAPCUT ${Math.round(progress*100)}% • ${Math.ceil(recordedDuration)} СЕК`);
+ await conversion.execute();
+ if(!target.buffer)throw new Error("CAPCUT MP4 IS EMPTY");
+ return new Blob([target.buffer],{type:"video/mp4"});
+}
+
 function startRec(audioTracksOverride=null,tag="AGENT_Z"){
  resizeRec();
 
@@ -958,9 +1008,19 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
 
- recorder.onstop=()=>{
+ recorder.onstop=async()=>{
   closeTeleprompter();
-  const blob=new Blob(chunks,{type:mime});
+  const rawBlob=new Blob(chunks,{type:mime});
+  let blob=rawBlob;
+  if(tag.startsWith("AI_")){
+   setStatus("CAPCUT FIX");
+   try{
+    blob=await makeCapCutCompatible(rawBlob);
+   }catch(capCutError){
+    console.error("CAPCUT CONVERSION",capCutError);
+    warn("CAPCUT-КОДИРОВАНИЕ НЕ ПОДДЕРЖИВАЕТСЯ ЭТИМ БРАУЗЕРОМ. СОХРАНЁН ИСХОДНЫЙ MP4.");
+   }
+  }
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
 
   el.downloadZip.href=URL.createObjectURL(blob);
