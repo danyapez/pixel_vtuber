@@ -191,7 +191,7 @@ let aiEnvelope=null,aiEnvelopeStep=.02,aiLastEnergy=0,aiProcessingLatency=0;
 let aiSourceStartAt=0,aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTeleprompterWords=[],aiTeleprompterWeights=[],aiTeleprompterTotalWeight=0,aiTeleprompterWordIndex=-1;
 let aiSubtitleCues=[],aiSubtitleText="";
 let aiMutedMicTracks=[],audioSessionBeforeAI=null;
-let recorder=null,chunks=[],subtitleRecorder=null,subtitleChunks=[],lastVideoTime=-1,nextRecRender=0,activeRecordingStamp="",activeExportJobs=0;
+let recorder=null,chunks=[],subtitleRecorder=null,subtitleChunks=[],lastVideoTime=-1,nextRecRender=0,activeRecordingStamp="",activeExportJobs=0,exportProgress={};
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
@@ -211,8 +211,8 @@ function resizeRec(){
  const s=exportSettings();
  recCanvas.width=s.w;
  recCanvas.height=s.h;
- subtitleCanvas.width=s.w;
- subtitleCanvas.height=s.h;
+ subtitleCanvas.width=1080;
+ subtitleCanvas.height=1920;
  el.exportInfo.textContent=s.label;
 }
 
@@ -308,45 +308,66 @@ function render(ctx,w,h,bg){
  ctx.drawImage(sp,x,y,sw,sh);
 }
 
-function wrapSubtitleText(ctx,text,maxWidth){
- const words=text.trim().split(/\s+/).filter(Boolean),lines=[];
- let line="";
- for(const word of words){
-  const candidate=line?`${line} ${word}`:word;
-  if(line&&ctx.measureText(candidate).width>maxWidth){lines.push(line);line=word}
-  else line=candidate;
+function layoutSubtitleLines(ctx,words,maxWidth){
+ const lines=[];
+ const spaceWidth=ctx.measureText(" ").width;
+ let line={items:[],width:0};
+ for(let index=0;index<words.length;index++){
+  const text=words[index],wordWidth=ctx.measureText(text).width;
+  const candidateWidth=line.width+(line.items.length?spaceWidth:0)+wordWidth;
+  if(line.items.length&&candidateWidth>maxWidth){
+   lines.push(line);
+   line={items:[],width:0};
+  }
+  if(line.items.length)line.width+=spaceWidth;
+  line.items.push({index,text,width:wordWidth});
+  line.width+=wordWidth;
  }
- if(line)lines.push(line);
- if(lines.length>2){lines[1]=lines.slice(1).join(" ");lines.length=2}
- return lines;
+ if(line.items.length)lines.push(line);
+ return {lines,spaceWidth};
 }
 
 function renderSubtitles(ctx,w,h){
  ctx.imageSmoothingEnabled=false;
  ctx.fillStyle=GREEN;
  ctx.fillRect(0,0,w,h);
- if(!aiMode||!audioCtx||!aiSubtitleText)return;
+ if(!aiMode||!audioCtx||!aiTeleprompterWords.length||aiTeleprompterWordIndex<0)return;
  const elapsed=audioCtx.currentTime-aiTeleprompterStartAt;
  if(elapsed<0||elapsed>aiTeleprompterDuration+.12)return;
 
- const scale=h/1080;
- const fontSize=Math.round(38*scale),lineHeight=Math.round(62*scale);
- const horizontalPadding=Math.round(48*scale),verticalPadding=Math.round(31*scale);
+ const scale=w/1080;
+ const fontSize=Math.round(38*scale),lineHeight=Math.round(92*scale);
+ const plaquePadX=Math.round(14*scale),plaquePadY=Math.round(12*scale);
  ctx.font=`${fontSize}px "Press Start 2P",monospace`;
- ctx.textAlign="center";
+ ctx.textAlign="left";
  ctx.textBaseline="middle";
- const lines=wrapSubtitleText(ctx,aiSubtitleText,w-Math.round(260*scale));
- if(!lines.length)return;
- const widest=Math.max(...lines.map(line=>ctx.measureText(line).width));
- const plaqueWidth=Math.min(w-Math.round(160*scale),Math.ceil(widest+horizontalPadding*2));
- const plaqueHeight=verticalPadding*2+lineHeight*lines.length;
- const plaqueX=Math.round((w-plaqueWidth)/2);
- const plaqueY=Math.round(h-plaqueHeight-110*scale);
- ctx.fillStyle="#7741F6";
- ctx.fillRect(plaqueX,plaqueY,plaqueWidth,plaqueHeight);
- ctx.fillStyle="#FFFFFF";
- const firstLineY=plaqueY+verticalPadding+lineHeight/2;
- lines.forEach((line,index)=>ctx.fillText(line,w/2,firstLineY+index*lineHeight,plaqueWidth-horizontalPadding*2));
+ const words=aiTeleprompterWords.map(word=>word.textContent);
+ const layout=layoutSubtitleLines(ctx,words,w-Math.round(150*scale));
+ const currentLine=Math.max(0,layout.lines.findIndex(line=>line.items.some(item=>item.index===aiTeleprompterWordIndex)));
+ const pageStart=Math.floor(currentLine/2)*2;
+ const pageLines=layout.lines.slice(pageStart,pageStart+2);
+ if(!pageLines.length)return;
+ const firstLineY=pageLines.length===1?h/2:h/2-lineHeight/2;
+
+ pageLines.forEach((line,lineIndex)=>{
+  const y=firstLineY+lineIndex*lineHeight;
+  let x=(w-line.width)/2;
+  line.items.forEach((item,itemIndex)=>{
+   const isCurrent=item.index===aiTeleprompterWordIndex;
+   if(isCurrent){
+    ctx.fillStyle="#7741F6";
+    ctx.fillRect(
+     Math.round(x-plaquePadX),
+     Math.round(y-fontSize*.72-plaquePadY),
+     Math.ceil(item.width+plaquePadX*2),
+     Math.ceil(fontSize*1.44+plaquePadY*2)
+    );
+   }
+   ctx.fillStyle=isCurrent?"#FFFFFF":item.index<aiTeleprompterWordIndex?"#A0A0A0":"#777777";
+   ctx.fillText(item.text,x,y);
+   x+=item.width+(itemIndex<line.items.length-1?layout.spaceWidth:0);
+  });
+ });
 }
 
 async function initFace(){
@@ -693,7 +714,7 @@ async function startAIRecording(){
  prepareAISpeakerOutput();
  const started=startRec(aiRecordingDestination.stream.getAudioTracks(),"AI_AGENT_Z");
  if(!started){finishAI();throw new Error("ЗАПИСЬ MP4 НЕ ПОДДЕРЖИВАЕТСЯ.")}
- el.aiRec.classList.add("active");el.aiRec.textContent="ЗАПИСЬ";setStatus("REC AI");
+ el.aiRec.classList.add("active");el.aiRec.textContent="ЗАПИСЬ";setStatus("ЗАПИСЬ");
 
  aiAudioSource.onended=()=>{
   if(!aiStopRequested)setTimeout(stopActiveRecorders,350);
@@ -812,7 +833,6 @@ function updateTeleprompter(vol,now){
    :progress>=1
     ?`КОНЕЦ • ${totalSeconds}/${totalSeconds} СЕК`
     :`AI • ${percent}% • ${elapsedSeconds}/${totalSeconds} СЕК`;
-  setStatus(`REC AI • ${percent}% • ${elapsedSeconds}/${totalSeconds} СЕК`);
   updateAITeleprompterProgress(progress);
   return;
  }
@@ -988,7 +1008,14 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
-async function makeCapCutCompatible(rawBlob,statusLabel="CAPCUT",videoBitrate=12000000,requireAudio=true){
+function setExportProgress(key,value){
+ exportProgress[key]=Math.max(0,Math.min(1,value));
+ const values=Object.values(exportProgress);
+ const total=values.length?values.reduce((sum,item)=>sum+item,0)/values.length:0;
+ setStatus(`ЗАГРУЗКА ${Math.round(total*100)}%`);
+}
+
+async function makeCapCutCompatible(rawBlob,progressKey="file",videoBitrate=12000000,requireAudio=true){
  let mediaTools;
  try{
   mediaTools=await import("https://cdn.jsdelivr.net/npm/mediabunny@1.51.0/+esm");
@@ -1024,7 +1051,7 @@ async function makeCapCutCompatible(rawBlob,statusLabel="CAPCUT",videoBitrate=12
  if(!conversion.isValid)throw new Error("CAPCUT ENCODER IS NOT SUPPORTED");
  if(!conversion.utilizedTracks.includes(inputVideoTrack))throw new Error("CAPCUT VIDEO TRACK WAS DISCARDED");
  if(inputAudioTrack&&!conversion.utilizedTracks.includes(inputAudioTrack))throw new Error("CAPCUT AUDIO TRACK WAS DISCARDED");
- conversion.onProgress=progress=>setStatus(`${statusLabel} ${Math.round(progress*100)}% • ${Math.ceil(recordedDuration)} СЕК`);
+ conversion.onProgress=progress=>setExportProgress(progressKey,progress);
  await conversion.execute();
  if(!target.buffer)throw new Error("CAPCUT MP4 IS EMPTY");
  return new Blob([target.buffer],{type:"video/mp4"});
@@ -1043,7 +1070,8 @@ function setDownloadLink(link,blob,filename){
  link.setAttribute("aria-disabled","false");
 }
 
-function completeExportJob(){
+function completeExportJob(progressKey){
+ setExportProgress(progressKey,1);
  activeExportJobs=Math.max(0,activeExportJobs-1);
  if(activeExportJobs)return;
  el.rec.disabled=false;
@@ -1057,7 +1085,7 @@ function stopActiveRecorders(){
  let stopped=false;
  if(recorder&&recorder.state!=="inactive"){recorder.stop();stopped=true}
  if(subtitleRecorder&&subtitleRecorder.state!=="inactive"){subtitleRecorder.stop();stopped=true}
- if(stopped)closeTeleprompter();
+ if(stopped){closeTeleprompter();setStatus("ЗАГРУЗКА 0%")} 
  else if(aiMode)finishAI();
 }
 
@@ -1103,6 +1131,7 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  const recordsSubtitles=tag.startsWith("AI_");
  activeExportJobs=recordsSubtitles?2:1;
+ exportProgress=recordsSubtitles?{avatar:0,subtitles:0}:{avatar:0};
  if(recordsSubtitles){
   try{
    renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
@@ -1117,21 +1146,22 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
    subtitleRecorder.onstop=async()=>{
     const rawBlob=new Blob(subtitleChunks,{type:mime});
     let blob=rawBlob;
-    setStatus("СУБТИТРЫ");
+    setExportProgress("subtitles",0);
     try{
-     blob=await makeCapCutCompatible(rawBlob,"СУБТИТРЫ",8000000,false);
+     blob=await makeCapCutCompatible(rawBlob,"subtitles",8000000,false);
     }catch(subtitleError){
      console.error("SUBTITLE CONVERSION",subtitleError);
      warn("СУБТИТРЫ СОХРАНЕНЫ В ИСХОДНОМ MP4: CAPCUT-КОДИРОВАНИЕ НЕДОСТУПНО.");
     }
-    setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_green_1920x1080_${activeRecordingStamp}.mp4`);
+    setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_green_1080x1920_${activeRecordingStamp}.mp4`);
     subtitleRecorder=null;
-    completeExportJob();
+    completeExportJob("subtitles");
    };
   }catch(subtitleRecorderError){
    console.error("SUBTITLE RECORDER",subtitleRecorderError);
    subtitleRecorder=null;
    activeExportJobs=1;
+   exportProgress={avatar:0};
    warn("ОТДЕЛЬНАЯ ЗАПИСЬ СУБТИТРОВ НЕ ПОДДЕРЖИВАЕТСЯ ЭТИМ БРАУЗЕРОМ.");
   }
  }
@@ -1140,9 +1170,9 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   const rawBlob=new Blob(chunks,{type:mime});
   let blob=rawBlob;
   if(recordsSubtitles){
-   setStatus("ПЕРСОНАЖ");
+   setExportProgress("avatar",0);
    try{
-    blob=await makeCapCutCompatible(rawBlob,"ПЕРСОНАЖ",settings.br);
+    blob=await makeCapCutCompatible(rawBlob,"avatar",settings.br);
    }catch(capCutError){
     console.error("CAPCUT CONVERSION",capCutError);
     warn("CAPCUT-КОДИРОВАНИЕ НЕ ПОДДЕРЖИВАЕТСЯ ЭТИМ БРАУЗЕРОМ. СОХРАНЁН ИСХОДНЫЙ MP4.");
@@ -1150,7 +1180,7 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   }
   setDownloadLink(el.downloadZip,blob,`danyapez_avatar_${tag}_${settings.label.replace("×","x")}_${activeRecordingStamp}.mp4`);
   recorder=null;
-  completeExportJob();
+  completeExportJob("avatar");
  };
 
  // Оба холста начинают запись до старта звука и останавливаются в один момент — тайминг совпадает.
@@ -1162,7 +1192,7 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
  el.rec.disabled=true;
  el.aiRec.disabled=true;
  el.stop.disabled=false;
- setStatus("REC MP4");
+ setStatus("ЗАПИСЬ");
  return true;
 }
 
