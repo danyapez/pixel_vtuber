@@ -19,6 +19,9 @@ html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:"Press
 h1{margin:0 0 6px;font-size:15px;line-height:1.45;letter-spacing:.5px}
 p{margin:0;color:#8f8f8f;font-size:8px;line-height:1.8}
 .buttons,.manual{display:grid;gap:9px}
+.downloads{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.downloads a[aria-disabled="true"]{opacity:.3;pointer-events:none;cursor:not-allowed}
+.downloads a[aria-disabled="false"]{border-color:#7741F6;color:#fff}
 .manual{grid-template-columns:1fr 1fr}
 button,a,select{width:100%;border:1px solid #fff;border-radius:0;padding:13px 10px;background:transparent;color:#fff;font-family:"Press Start 2P",monospace;font-size:8px;line-height:1.45;text-align:center;text-decoration:none;cursor:pointer}
 select{text-align:left;appearance:none;-webkit-appearance:none}
@@ -44,7 +47,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 .block-title{color:#7741F6;font-size:8px;line-height:1.6}
 #voiceFxToggle.active{background:#7741F6;border-color:#7741F6}
 .small-note{color:#777;font:11px/1.45 Arial,sans-serif}
-.teleprompter-editor textarea{width:100%;min-height:120px;resize:vertical;border:1px solid rgba(255,255,255,.35);background:#000;color:#fff;padding:12px;font:16px/1.5 Arial,sans-serif}
+.teleprompter-editor textarea{width:100%;min-height:120px;resize:vertical;border:1px solid rgba(255,255,255,.35);background:#000;color:#fff;padding:12px;font:10px/1.9 "Press Start 2P",monospace}
 .teleprompter-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .rec-grid{display:grid;grid-template-columns:1fr;gap:9px}
 #aiRec.active{background:#7741F6;border-color:#7741F6}
@@ -54,7 +57,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 .teleprompter-reader.speaking .teleprompter-reader-head{color:#24c86a}
 .teleprompter-scroll{height:100%;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;cursor:grab;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .teleprompter-scroll::-webkit-scrollbar{display:none}
-.teleprompter-text{padding:72px 14px 190px;white-space:pre-wrap;font:700 27px/1.48 Arial,sans-serif;text-align:center}
+.teleprompter-text{padding:72px 14px 190px;white-space:pre-wrap;font:16px/1.9 "Press Start 2P",monospace;text-align:center}
 .teleprompter-text .tp-word{opacity:.34;transition:opacity .16s,color .16s,background .16s}
 .teleprompter-text .tp-word.spoken{opacity:.58;color:#aaa}
 .teleprompter-text .tp-word.current{opacity:1;color:#fff;background:#7741F6;box-shadow:0 0 0 3px #7741F6}
@@ -66,9 +69,9 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
  #camera{width:130px;right:10px;bottom:10px}
  h1{font-size:12px} button,a,select{font-size:7px;padding:12px 9px}
  .teleprompter-reader{top:4px;height:225px}
- .teleprompter-text{font-size:24px}
+ .teleprompter-text{font-size:14px}
 }
-@media(max-width:520px){.teleprompter-actions{grid-template-columns:1fr}}
+@media(max-width:520px){.teleprompter-actions,.downloads{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -104,7 +107,10 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <button id="aiRec">ЗАПИСЬ</button>
 </div>
 
-<a id="downloadZip" class="hidden" download>DOWNLOAD MP4</a>
+<div class="downloads">
+<a id="downloadZip" aria-disabled="true" download>СКАЧАТЬ ПЕРСОНАЖА</a>
+<a id="downloadSubtitles" aria-disabled="true" download>СКАЧАТЬ СУБТИТРЫ</a>
+</div>
 
 <div class="hidden">
   <button id="start" type="button"></button>
@@ -139,6 +145,8 @@ const preview=document.querySelector("#preview");
 const pctx=preview.getContext("2d",{alpha:false});
 const recCanvas=document.createElement("canvas");
 const rctx=recCanvas.getContext("2d",{alpha:false});
+const subtitleCanvas=document.createElement("canvas");
+const sctx=subtitleCanvas.getContext("2d",{alpha:false});
 const video=document.querySelector("#camera");
 
 const el={
@@ -147,6 +155,7 @@ const el={
  aiRec:document.querySelector("#aiRec"),
  stop:document.querySelector("#stop"),
  downloadZip:document.querySelector("#downloadZip"),
+ downloadSubtitles:document.querySelector("#downloadSubtitles"),
  warn:document.querySelector("#warn"),
  status:document.querySelector("#status"),
  sprite:document.querySelector("#sprite"),
@@ -180,8 +189,9 @@ let teleprompterActive=false,teleprompterSpeakingUntil=0,teleprompterLastFrame=0
 let aiMode=false,aiAudioSource=null,aiRecordingDestination=null,aiRobotOscillator=null,aiStopRequested=false,aiMotionTime=0,aiExpressionTime=0,aiMouthUntil=0;
 let aiEnvelope=null,aiEnvelopeStep=.02,aiLastEnergy=0,aiProcessingLatency=0;
 let aiSourceStartAt=0,aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTeleprompterWords=[],aiTeleprompterWeights=[],aiTeleprompterTotalWeight=0,aiTeleprompterWordIndex=-1;
+let aiSubtitleCues=[],aiSubtitleText="";
 let aiMutedMicTracks=[],audioSessionBeforeAI=null;
-let recorder=null, chunks=[], lastVideoTime=-1, nextRecRender=0;
+let recorder=null,chunks=[],subtitleRecorder=null,subtitleChunks=[],lastVideoTime=-1,nextRecRender=0,activeRecordingStamp="",activeExportJobs=0;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
@@ -201,6 +211,8 @@ function resizeRec(){
  const s=exportSettings();
  recCanvas.width=s.w;
  recCanvas.height=s.h;
+ subtitleCanvas.width=s.w;
+ subtitleCanvas.height=s.h;
  el.exportInfo.textContent=s.label;
 }
 
@@ -294,6 +306,47 @@ function render(ctx,w,h,bg){
  const y=Math.round(h/2-sh/2+smoothHead.y*f);
 
  ctx.drawImage(sp,x,y,sw,sh);
+}
+
+function wrapSubtitleText(ctx,text,maxWidth){
+ const words=text.trim().split(/\s+/).filter(Boolean),lines=[];
+ let line="";
+ for(const word of words){
+  const candidate=line?`${line} ${word}`:word;
+  if(line&&ctx.measureText(candidate).width>maxWidth){lines.push(line);line=word}
+  else line=candidate;
+ }
+ if(line)lines.push(line);
+ if(lines.length>2){lines[1]=lines.slice(1).join(" ");lines.length=2}
+ return lines;
+}
+
+function renderSubtitles(ctx,w,h){
+ ctx.imageSmoothingEnabled=false;
+ ctx.fillStyle=GREEN;
+ ctx.fillRect(0,0,w,h);
+ if(!aiMode||!audioCtx||!aiSubtitleText)return;
+ const elapsed=audioCtx.currentTime-aiTeleprompterStartAt;
+ if(elapsed<0||elapsed>aiTeleprompterDuration+.12)return;
+
+ const scale=h/1080;
+ const fontSize=Math.round(38*scale),lineHeight=Math.round(62*scale);
+ const horizontalPadding=Math.round(48*scale),verticalPadding=Math.round(31*scale);
+ ctx.font=`${fontSize}px "Press Start 2P",monospace`;
+ ctx.textAlign="center";
+ ctx.textBaseline="middle";
+ const lines=wrapSubtitleText(ctx,aiSubtitleText,w-Math.round(260*scale));
+ if(!lines.length)return;
+ const widest=Math.max(...lines.map(line=>ctx.measureText(line).width));
+ const plaqueWidth=Math.min(w-Math.round(160*scale),Math.ceil(widest+horizontalPadding*2));
+ const plaqueHeight=verticalPadding*2+lineHeight*lines.length;
+ const plaqueX=Math.round((w-plaqueWidth)/2);
+ const plaqueY=Math.round(h-plaqueHeight-110*scale);
+ ctx.fillStyle="#7741F6";
+ ctx.fillRect(plaqueX,plaqueY,plaqueWidth,plaqueHeight);
+ ctx.fillStyle="#FFFFFF";
+ const firstLineY=plaqueY+verticalPadding+lineHeight/2;
+ lines.forEach((line,index)=>ctx.fillText(line,w/2,firstLineY+index*lineHeight,plaqueWidth-horizontalPadding*2));
 }
 
 async function initFace(){
@@ -574,7 +627,7 @@ function finishAI(){
  if(aiRobotOscillator){try{aiRobotOscillator.stop()}catch(error){}try{aiRobotOscillator.disconnect()}catch(error){}aiRobotOscillator=null}
  aiMode=false;aiStopRequested=false;aiAudioSource=null;aiMotionTime=0;aiExpressionTime=0;
  aiEnvelope=null;aiLastEnergy=0;aiProcessingLatency=0;
- aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;
+ aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;aiSubtitleCues=[];aiSubtitleText="";
  analyser=micAnalyser;audioData=micAudioData;
  el.aiRec.classList.remove("active");el.aiRec.textContent="ЗАПИСЬ";
 }
@@ -622,6 +675,7 @@ async function startAIRecording(){
  hideWarn();el.aiRec.disabled=true;el.rec.disabled=true;el.aiRec.classList.add("active");el.aiRec.textContent="ЗАГРУЗКА";setStatus("ЗАГРУЗКА");
  if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:AUDIO_SAMPLE_RATE,latencyHint:"playback"})}catch(_){audioCtx=new (window.AudioContext||window.webkitAudioContext)()}}
  await audioCtx.resume();
+ try{if(document.fonts?.load)await document.fonts.load('38px "Press Start 2P"')}catch(fontError){console.warn("SUBTITLE FONT",fontError)}
 
  const result=await synthesizeText(text);
  setStatus("ОБРАБОТКА AI");
@@ -642,7 +696,7 @@ async function startAIRecording(){
  el.aiRec.classList.add("active");el.aiRec.textContent="ЗАПИСЬ";setStatus("REC AI");
 
  aiAudioSource.onended=()=>{
-  if(recorder&&recorder.state!=="inactive"&&!aiStopRequested)setTimeout(()=>{if(recorder&&recorder.state!=="inactive")recorder.stop()},350);
+  if(!aiStopRequested)setTimeout(stopActiveRecorders,350);
  };
  await audioCtx.resume();
  aiAudioSource.start(aiSourceStartAt);
@@ -686,7 +740,7 @@ function saveTeleprompter(){
 
 function prepareAITeleprompter(text){
  el.teleprompterText.textContent="";
- aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;
+ aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;aiSubtitleCues=[];aiSubtitleText="";
  const parts=text.match(/\S+|\s+/g)||[];
  for(const part of parts){
   if(/^\s+$/.test(part)){el.teleprompterText.append(document.createTextNode(part));continue}
@@ -694,6 +748,16 @@ function prepareAITeleprompter(text){
   const punctuation=(part.match(/[.!?…]/g)||[]).length*5+(part.match(/[,;:—-]/g)||[]).length*2;
   aiTeleprompterTotalWeight+=Math.max(2,part.replace(/[^\p{L}\p{N}]/gu,"").length)+punctuation;
   aiTeleprompterWeights.push(aiTeleprompterTotalWeight);
+ }
+ let cueStart=0,cueWords=[],cueLength=0;
+ for(let index=0;index<aiTeleprompterWords.length;index++){
+  const value=aiTeleprompterWords[index].textContent;
+  cueWords.push(value);cueLength+=value.length+(cueWords.length>1?1:0);
+  const sentenceEnd=/[.!?…]["')\]»]*$/.test(value);
+  if(sentenceEnd||cueWords.length>=6||cueLength>=36||index===aiTeleprompterWords.length-1){
+   aiSubtitleCues.push({start:cueStart,end:index,text:cueWords.join(" ")});
+   cueStart=index+1;cueWords=[];cueLength=0;
+  }
  }
 }
 
@@ -706,6 +770,8 @@ function updateAITeleprompterProgress(progress){
  if(nextIndex!==aiTeleprompterWordIndex){
   for(let i=0;i<aiTeleprompterWords.length;i++)aiTeleprompterWords[i].className="tp-word"+(i<nextIndex?" spoken":i===nextIndex?" current":"");
   aiTeleprompterWordIndex=nextIndex;
+  const cue=aiSubtitleCues.find(item=>nextIndex>=item.start&&nextIndex<=item.end);
+  aiSubtitleText=cue?.text||aiTeleprompterWords[nextIndex]?.textContent||"";
  }
  const word=aiTeleprompterWords[nextIndex];
  const wanted=word.offsetTop-el.teleprompterScroll.clientHeight*.42+word.offsetHeight*.5;
@@ -915,13 +981,14 @@ function loop(){
  if(now>=nextRecRender){
   nextRecRender=now+1000/30;
   render(rctx,recCanvas.width,recCanvas.height,GREEN);
+  renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
  }
 
  el.sprite.textContent=stable.toUpperCase();
  requestAnimationFrame(loop);
 }
 
-async function makeCapCutCompatible(rawBlob){
+async function makeCapCutCompatible(rawBlob,statusLabel="CAPCUT",videoBitrate=12000000,requireAudio=true){
  let mediaTools;
  try{
   mediaTools=await import("https://cdn.jsdelivr.net/npm/mediabunny@1.51.0/+esm");
@@ -939,27 +1006,59 @@ async function makeCapCutCompatible(rawBlob){
   input.getPrimaryVideoTrack(),input.getPrimaryAudioTrack()
  ]);
  if(!inputVideoTrack)throw new Error("RECORDED VIDEO TRACK IS MISSING");
- if(!inputAudioTrack)throw new Error("RECORDED AI AUDIO TRACK IS MISSING");
+ if(requireAudio&&!inputAudioTrack)throw new Error("RECORDED AI AUDIO TRACK IS MISSING");
  const target=new BufferTarget();
  const output=new Output({format:new Mp4OutputFormat(),target});
- const conversion=await Conversion.init({
+ const conversionOptions={
   input,output,tracks:"primary",tags:{},
   video:{
-   codec:"avc",frameRate:30,bitrate:12000000,keyFrameInterval:2,
+   codec:"avc",frameRate:30,bitrate:videoBitrate,keyFrameInterval:2,
    forceTranscode:true,hardwareAcceleration:"prefer-hardware"
-  },
-  audio:{
+  }
+ };
+ if(inputAudioTrack)conversionOptions.audio={
    codec:"aac",sampleRate:AUDIO_SAMPLE_RATE,numberOfChannels:1,
    bitrate:192000,forceTranscode:true
-  }
- });
+ };
+ const conversion=await Conversion.init(conversionOptions);
  if(!conversion.isValid)throw new Error("CAPCUT ENCODER IS NOT SUPPORTED");
  if(!conversion.utilizedTracks.includes(inputVideoTrack))throw new Error("CAPCUT VIDEO TRACK WAS DISCARDED");
- if(!conversion.utilizedTracks.includes(inputAudioTrack))throw new Error("CAPCUT AUDIO TRACK WAS DISCARDED");
- conversion.onProgress=progress=>setStatus(`CAPCUT ${Math.round(progress*100)}% • ${Math.ceil(recordedDuration)} СЕК`);
+ if(inputAudioTrack&&!conversion.utilizedTracks.includes(inputAudioTrack))throw new Error("CAPCUT AUDIO TRACK WAS DISCARDED");
+ conversion.onProgress=progress=>setStatus(`${statusLabel} ${Math.round(progress*100)}% • ${Math.ceil(recordedDuration)} СЕК`);
  await conversion.execute();
  if(!target.buffer)throw new Error("CAPCUT MP4 IS EMPTY");
  return new Blob([target.buffer],{type:"video/mp4"});
+}
+
+function resetDownloadLink(link){
+ const oldUrl=link.getAttribute("href");
+ if(oldUrl?.startsWith("blob:"))URL.revokeObjectURL(oldUrl);
+ link.removeAttribute("href");
+ link.setAttribute("aria-disabled","true");
+}
+
+function setDownloadLink(link,blob,filename){
+ link.href=URL.createObjectURL(blob);
+ link.download=filename;
+ link.setAttribute("aria-disabled","false");
+}
+
+function completeExportJob(){
+ activeExportJobs=Math.max(0,activeExportJobs-1);
+ if(activeExportJobs)return;
+ el.rec.disabled=false;
+ el.aiRec.disabled=false;
+ el.stop.disabled=true;
+ if(aiMode)finishAI();
+ setStatus("READY");
+}
+
+function stopActiveRecorders(){
+ let stopped=false;
+ if(recorder&&recorder.state!=="inactive"){recorder.stop();stopped=true}
+ if(subtitleRecorder&&subtitleRecorder.state!=="inactive"){subtitleRecorder.stop();stopped=true}
+ if(stopped)closeTeleprompter();
+ else if(aiMode)finishAI();
 }
 
 function startRec(audioTracksOverride=null,tag="AGENT_Z"){
@@ -972,8 +1071,10 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   return false;
  }
 
- chunks=[];
- el.downloadZip.classList.add("hidden");
+ chunks=[];subtitleChunks=[];
+ resetDownloadLink(el.downloadZip);
+ resetDownloadLink(el.downloadSubtitles);
+ activeRecordingStamp=new Date().toISOString().replace(/[:.]/g,"-");
 
  const settings=exportSettings();
  const videoStream=recCanvas.captureStream(30);
@@ -998,37 +1099,62 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   videoBitsPerSecond:settings.br,
   audioBitsPerSecond:192000
  });
-
  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
 
+ const recordsSubtitles=tag.startsWith("AI_");
+ activeExportJobs=recordsSubtitles?2:1;
+ if(recordsSubtitles){
+  try{
+   renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
+   const subtitleVideoStream=subtitleCanvas.captureStream(30);
+   const subtitleStream=new MediaStream(subtitleVideoStream.getVideoTracks());
+   subtitleRecorder=new MediaRecorder(subtitleStream,{
+    mimeType:mime,
+    videoBitsPerSecond:8000000,
+    audioBitsPerSecond:192000
+   });
+   subtitleRecorder.ondataavailable=e=>{if(e.data&&e.data.size)subtitleChunks.push(e.data)};
+   subtitleRecorder.onstop=async()=>{
+    const rawBlob=new Blob(subtitleChunks,{type:mime});
+    let blob=rawBlob;
+    setStatus("СУБТИТРЫ");
+    try{
+     blob=await makeCapCutCompatible(rawBlob,"СУБТИТРЫ",8000000,false);
+    }catch(subtitleError){
+     console.error("SUBTITLE CONVERSION",subtitleError);
+     warn("СУБТИТРЫ СОХРАНЕНЫ В ИСХОДНОМ MP4: CAPCUT-КОДИРОВАНИЕ НЕДОСТУПНО.");
+    }
+    setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_green_1920x1080_${activeRecordingStamp}.mp4`);
+    subtitleRecorder=null;
+    completeExportJob();
+   };
+  }catch(subtitleRecorderError){
+   console.error("SUBTITLE RECORDER",subtitleRecorderError);
+   subtitleRecorder=null;
+   activeExportJobs=1;
+   warn("ОТДЕЛЬНАЯ ЗАПИСЬ СУБТИТРОВ НЕ ПОДДЕРЖИВАЕТСЯ ЭТИМ БРАУЗЕРОМ.");
+  }
+ }
+
  recorder.onstop=async()=>{
-  closeTeleprompter();
   const rawBlob=new Blob(chunks,{type:mime});
   let blob=rawBlob;
-  if(tag.startsWith("AI_")){
-   setStatus("CAPCUT FIX");
+  if(recordsSubtitles){
+   setStatus("ПЕРСОНАЖ");
    try{
-    blob=await makeCapCutCompatible(rawBlob);
+    blob=await makeCapCutCompatible(rawBlob,"ПЕРСОНАЖ",settings.br);
    }catch(capCutError){
     console.error("CAPCUT CONVERSION",capCutError);
     warn("CAPCUT-КОДИРОВАНИЕ НЕ ПОДДЕРЖИВАЕТСЯ ЭТИМ БРАУЗЕРОМ. СОХРАНЁН ИСХОДНЫЙ MP4.");
    }
   }
-  const stamp=new Date().toISOString().replace(/[:.]/g,"-");
-
-  el.downloadZip.href=URL.createObjectURL(blob);
-  el.downloadZip.download=`danyapez_avatar_${tag}_${settings.label.replace("×","x")}_${stamp}.mp4`;
-  el.downloadZip.classList.remove("hidden");
-  setTimeout(()=>el.downloadZip.click(),120);
-
-  el.rec.disabled=false;
-  el.aiRec.disabled=false;
-  el.stop.disabled=true;
-  if(aiMode)finishAI();
-  setStatus("READY");
+  setDownloadLink(el.downloadZip,blob,`danyapez_avatar_${tag}_${settings.label.replace("×","x")}_${activeRecordingStamp}.mp4`);
+  recorder=null;
+  completeExportJob();
  };
 
- // Исходный надёжный режим MediaRecorder: звук регулярно сбрасывается в MP4.
+ // Оба холста начинают запись до старта звука и останавливаются в один момент — тайминг совпадает.
+ if(subtitleRecorder)subtitleRecorder.start(1000);
  recorder.start(1000);
  if(el.teleprompterInput.value.trim())openTeleprompter(true);
 
@@ -1110,7 +1236,7 @@ el.aiRec.onclick=async()=>{
 el.stop.onclick=()=>{
  aiStopRequested=true;
  if(aiAudioSource){try{aiAudioSource.stop()}catch(_){}}
- if(recorder&&recorder.state!=="inactive")recorder.stop();else if(aiMode)finishAI();
+ stopActiveRecorders();
 };
 
 el.showCam.onchange=()=>video.classList.toggle("visible",el.showCam.checked);
@@ -1120,6 +1246,7 @@ resizeRec();
 stable="static";
 render(pctx,preview.width,preview.height,"#000000");
 render(rctx,recCanvas.width,recCanvas.height,GREEN);
+renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
 loop();
 setStatus("READY");
 warmEdgeTTS();
