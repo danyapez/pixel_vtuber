@@ -192,6 +192,7 @@ let aiSourceStartAt=0,aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTelepro
 let aiSubtitleCues=[],aiSubtitleText="";
 let aiMutedMicTracks=[],audioSessionBeforeAI=null;
 let recorder=null,chunks=[],subtitleRecorder=null,subtitleChunks=[],lastVideoTime=-1,nextRecRender=0,activeRecordingStamp="",activeExportJobs=0,exportProgress={};
+let screenWakeLock=null,screenWakeLockWanted=false;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
@@ -202,6 +203,22 @@ let wavSource=null, wavProcessor=null, wavSilentGain=null, wavBuffers=[], wavSam
 function setStatus(t){el.status.textContent=t}
 function warn(t){el.warn.textContent=t;el.warn.classList.add("visible")}
 function hideWarn(){el.warn.classList.remove("visible")}
+
+async function keepScreenAwake(){
+ screenWakeLockWanted=true;
+ if(screenWakeLock||!navigator.wakeLock?.request||document.visibilityState!=="visible")return;
+ try{
+  const lock=await navigator.wakeLock.request("screen");
+  screenWakeLock=lock;
+  lock.addEventListener("release",()=>{if(screenWakeLock===lock)screenWakeLock=null},{once:true});
+ }catch(error){console.warn("SCREEN WAKE LOCK",error)}
+}
+
+function releaseScreenAwake(){
+ screenWakeLockWanted=false;
+ const lock=screenWakeLock;screenWakeLock=null;
+ if(lock)lock.release().catch(error=>console.warn("SCREEN WAKE RELEASE",error));
+}
 
 function exportSettings(){
  return {w:1920,h:1080,br:12000000,label:"1920×1080"};
@@ -644,6 +661,7 @@ async function buildAIVoiceGraph(source){
 }
 
 function finishAI(){
+ releaseScreenAwake();
  restoreAISpeakerOutput();
  if(aiRobotOscillator){try{aiRobotOscillator.stop()}catch(error){}try{aiRobotOscillator.disconnect()}catch(error){}aiRobotOscillator=null}
  aiMode=false;aiStopRequested=false;aiAudioSource=null;aiMotionTime=0;aiExpressionTime=0;
@@ -693,6 +711,7 @@ async function startAIRecording(){
  if(text.length>6000)throw new Error("СЛИШКОМ ДЛИННЫЙ ТЕКСТ. МАКСИМУМ 6000 СИМВОЛОВ.");
  if(recorder&&recorder.state!=="inactive")throw new Error("ЗАПИСЬ УЖЕ ИДЁТ.");
 
+ void keepScreenAwake();
  hideWarn();el.aiRec.disabled=true;el.rec.disabled=true;el.aiRec.classList.add("active");el.aiRec.textContent="ЗАГРУЗКА";setStatus("ЗАГРУЗКА");
  if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:AUDIO_SAMPLE_RATE,latencyHint:"playback"})}catch(_){audioCtx=new (window.AudioContext||window.webkitAudioContext)()}}
  await audioCtx.resume();
@@ -1085,6 +1104,7 @@ function stopActiveRecorders(){
  let stopped=false;
  if(recorder&&recorder.state!=="inactive"){recorder.stop();stopped=true}
  if(subtitleRecorder&&subtitleRecorder.state!=="inactive"){subtitleRecorder.stop();stopped=true}
+ releaseScreenAwake();
  if(stopped){closeTeleprompter();setStatus("ЗАГРУЗКА 0%")} 
  else if(aiMode)finishAI();
 }
@@ -1200,6 +1220,9 @@ el.teleprompterInput.value=localStorage.getItem("danyapezTeleprompterText")||"";
 el.teleprompterInput.addEventListener("input",saveTeleprompter);
 el.teleprompterDelete.onclick=deleteTeleprompter;
 el.teleprompterClose.onclick=closeTeleprompter;
+document.addEventListener("visibilitychange",()=>{
+ if(document.visibilityState==="visible"&&screenWakeLockWanted)void keepScreenAwake();
+});
 
 let teleDrag=false,teleStartY=0,teleStartScroll=0;
 el.teleprompterScroll.addEventListener("pointerdown",e=>{
