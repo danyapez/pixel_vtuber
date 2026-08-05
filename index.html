@@ -193,6 +193,7 @@ let aiSourceStartAt=0,aiTeleprompterStartAt=0,aiTeleprompterDuration=0,aiTelepro
 let aiSubtitleCues=[],aiSubtitleText="";
 let aiMutedMicTracks=[],audioSessionBeforeAI=null;
 let recorder=null,chunks=[],subtitleRecorder=null,subtitleChunks=[],lastVideoTime=-1,nextRecRender=0,activeRecordingStamp="",activeExportJobs=0,exportProgress={};
+let subtitleReplayActive=false,subtitleReplayStartAt=0,subtitleReplayStopQueued=false;
 let screenWakeLock=null,screenWakeLockWanted=false;
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
@@ -229,8 +230,10 @@ function resizeRec(){
  const s=exportSettings();
  recCanvas.width=s.w;
  recCanvas.height=s.h;
- subtitleCanvas.width=2160;
- subtitleCanvas.height=3840;
+ // 4K-холст создаётся только после записи персонажа. На iPhone два больших
+ // холста и два видеокодировщика одновременно приводят к перезапуску вкладки.
+ subtitleCanvas.width=1;
+ subtitleCanvas.height=1;
  el.exportInfo.textContent=s.label;
 }
 
@@ -350,7 +353,9 @@ function renderSubtitles(ctx,w,h){
  ctx.fillStyle=SUBTITLE_BACKGROUND;
  ctx.fillRect(0,0,w,h);
  if(!aiMode||!audioCtx||!aiTeleprompterWords.length||aiTeleprompterWordIndex<0)return;
- const elapsed=audioCtx.currentTime-aiTeleprompterStartAt;
+ const elapsed=subtitleReplayActive
+  ?(performance.now()-subtitleReplayStartAt)/1000
+  :audioCtx.currentTime-aiTeleprompterStartAt;
  if(elapsed<0||elapsed>aiTeleprompterDuration+.12)return;
 
  const scale=w/1080;
@@ -665,6 +670,7 @@ function finishAI(){
  releaseScreenAwake();
  restoreAISpeakerOutput();
  if(aiRobotOscillator){try{aiRobotOscillator.stop()}catch(error){}try{aiRobotOscillator.disconnect()}catch(error){}aiRobotOscillator=null}
+ subtitleReplayActive=false;subtitleReplayStartAt=0;subtitleReplayStopQueued=false;
  aiMode=false;aiStopRequested=false;aiAudioSource=null;aiMotionTime=0;aiExpressionTime=0;
  aiEnvelope=null;aiLastEnergy=0;aiProcessingLatency=0;
  aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;aiSubtitleCues=[];aiSubtitleText="";
@@ -1017,11 +1023,24 @@ function loop(){
  updateTeleprompter(v,now);
 
  render(pctx,preview.width,preview.height,"#000000");
- // Записываемый холст обновляется ровно с частотой кодирования, без двойной нагрузки в 60 FPS.
+ // В каждый момент работает только один большой записываемый холст.
  if(now>=nextRecRender){
   nextRecRender=now+1000/30;
-  render(rctx,recCanvas.width,recCanvas.height,GREEN);
-  renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
+  if(recorder&&recorder.state==="recording")render(rctx,recCanvas.width,recCanvas.height,GREEN);
+  if(subtitleReplayActive){
+   const subtitleElapsed=(now-subtitleReplayStartAt)/1000;
+   const subtitleProgress=Math.max(0,Math.min(1,subtitleElapsed/Math.max(.001,aiTeleprompterDuration)));
+   const subtitleStageProgress=Math.max(0,Math.min(1,(subtitleElapsed+.28)/(aiTeleprompterDuration+.63)));
+   setExportProgress("subtitles",subtitleStageProgress*.65);
+   updateAITeleprompterProgress(subtitleProgress);
+   renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
+   if(subtitleElapsed>=aiTeleprompterDuration+.35&&!subtitleReplayStopQueued){
+    subtitleReplayStopQueued=true;
+    Promise.resolve().then(()=>{
+     if(subtitleRecorder&&subtitleRecorder.state!=="inactive")subtitleRecorder.stop();
+    });
+   }
+  }
  }
 
  el.sprite.textContent=stable.toUpperCase();
@@ -1035,7 +1054,7 @@ function setExportProgress(key,value){
  setStatus(`ЗАГРУЗКА ${Math.round(total*100)}%`);
 }
 
-async function makeCapCutCompatible(rawBlob,progressKey="file",videoBitrate=12000000,requireAudio=true){
+async function makeCapCutCompatible(rawBlob,progressKey="file",videoBitrate=12000000,requireAudio=true,progressStart=0){
  let mediaTools;
  try{
   mediaTools=await import("https://cdn.jsdelivr.net/npm/mediabunny@1.51.0/+esm");
@@ -1071,7 +1090,7 @@ async function makeCapCutCompatible(rawBlob,progressKey="file",videoBitrate=1200
  if(!conversion.isValid)throw new Error("CAPCUT ENCODER IS NOT SUPPORTED");
  if(!conversion.utilizedTracks.includes(inputVideoTrack))throw new Error("CAPCUT VIDEO TRACK WAS DISCARDED");
  if(inputAudioTrack&&!conversion.utilizedTracks.includes(inputAudioTrack))throw new Error("CAPCUT AUDIO TRACK WAS DISCARDED");
- conversion.onProgress=progress=>setExportProgress(progressKey,progress);
+ conversion.onProgress=progress=>setExportProgress(progressKey,progressStart+(1-progressStart)*progress);
  await conversion.execute();
  if(!target.buffer)throw new Error("CAPCUT MP4 IS EMPTY");
  return new Blob([target.buffer],{type:"video/mp4"});
@@ -1090,6 +1109,66 @@ function setDownloadLink(link,blob,filename){
  link.setAttribute("aria-disabled","false");
 }
 
+function stopTracks(tracks){
+ for(const track of tracks||[]){try{track.stop()}catch(error){}}
+}
+
+function startSubtitleReplayRecording(mime,recordingStamp){
+ let subtitleTracks=[];
+ try{
+  subtitleChunks=[];
+  subtitleCanvas.width=2160;
+  subtitleCanvas.height=3840;
+  subtitleReplayActive=true;
+  subtitleReplayStopQueued=false;
+  subtitleReplayStartAt=performance.now()+280;
+  aiTeleprompterWordIndex=-1;
+  updateAITeleprompterProgress(0);
+  renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
+
+  const subtitleVideoStream=subtitleCanvas.captureStream(30);
+  subtitleTracks=subtitleVideoStream.getVideoTracks();
+  subtitleRecorder=new MediaRecorder(new MediaStream(subtitleTracks),{
+   mimeType:mime,
+   videoBitsPerSecond:16000000,
+   audioBitsPerSecond:192000
+  });
+  subtitleRecorder.ondataavailable=event=>{
+   if(event.data&&event.data.size)subtitleChunks.push(event.data);
+  };
+  subtitleRecorder.onstop=async()=>{
+   subtitleReplayActive=false;
+   stopTracks(subtitleTracks);
+   const rawBlob=new Blob(subtitleChunks,{type:mime});
+   subtitleCanvas.width=1;
+   subtitleCanvas.height=1;
+   let blob=rawBlob;
+   setExportProgress("subtitles",.65);
+   try{
+    blob=await makeCapCutCompatible(rawBlob,"subtitles",16000000,false,.65);
+   }catch(subtitleError){
+    console.error("SUBTITLE CONVERSION",subtitleError);
+    warn("СУБТИТРЫ СОХРАНЕНЫ В ИСХОДНОМ MP4: CAPCUT-КОДИРОВАНИЕ НЕДОСТУПНО.");
+   }
+   setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_black_2160x3840_${recordingStamp}.mp4`);
+   subtitleChunks=[];
+   subtitleRecorder=null;
+   completeExportJob("subtitles");
+  };
+  subtitleRecorder.start(500);
+  setExportProgress("subtitles",0);
+ }catch(subtitleRecorderError){
+  subtitleReplayActive=false;
+  stopTracks(subtitleTracks);
+  subtitleCanvas.width=1;
+  subtitleCanvas.height=1;
+  subtitleRecorder=null;
+  console.error("SUBTITLE RECORDER",subtitleRecorderError);
+  warn("ОТДЕЛЬНАЯ ЗАПИСЬ СУБТИТРОВ НЕ ПОДДЕРЖИВАЕТСЯ ЭТИМ БРАУЗЕРОМ.");
+  completeExportJob("subtitles");
+ }
+}
+
 function completeExportJob(progressKey){
  setExportProgress(progressKey,1);
  activeExportJobs=Math.max(0,activeExportJobs-1);
@@ -1105,13 +1184,14 @@ function stopActiveRecorders(){
  let stopped=false;
  if(recorder&&recorder.state!=="inactive"){recorder.stop();stopped=true}
  if(subtitleRecorder&&subtitleRecorder.state!=="inactive"){subtitleRecorder.stop();stopped=true}
- releaseScreenAwake();
- if(stopped){closeTeleprompter();setStatus("ЗАГРУЗКА 0%")} 
+ if(!aiMode)releaseScreenAwake();
+ if(stopped){el.stop.disabled=true;closeTeleprompter();setStatus("ЗАГРУЗКА 0%")} 
  else if(aiMode)finishAI();
 }
 
 function startRec(audioTracksOverride=null,tag="AGENT_Z"){
  resizeRec();
+ render(rctx,recCanvas.width,recCanvas.height,GREEN);
 
  const mime=mp4Mime();
  if(!mime){
@@ -1127,6 +1207,7 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  const settings=exportSettings();
  const videoStream=recCanvas.captureStream(30);
+ const avatarVideoTracks=videoStream.getVideoTracks();
  // Обычный REC пишет исходный трек микрофона — это самый совместимый вариант.
  // REC AI передаёт сюда отдельный синтезированный аудиотрек через audioTracksOverride.
  const audioTracks=audioTracksOverride!==null
@@ -1139,7 +1220,7 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  // Один поток: canvas-видео + микрофон. Так звук и видео стартуют вместе.
  const mixedStream=new MediaStream([
-  ...videoStream.getVideoTracks(),
+  ...avatarVideoTracks,
   ...audioTracks
  ]);
 
@@ -1153,42 +1234,9 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
  const recordsSubtitles=tag.startsWith("AI_");
  activeExportJobs=recordsSubtitles?2:1;
  exportProgress=recordsSubtitles?{avatar:0,subtitles:0}:{avatar:0};
- if(recordsSubtitles){
-  try{
-   renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
-   const subtitleVideoStream=subtitleCanvas.captureStream(30);
-   const subtitleStream=new MediaStream(subtitleVideoStream.getVideoTracks());
-   subtitleRecorder=new MediaRecorder(subtitleStream,{
-    mimeType:mime,
-    videoBitsPerSecond:16000000,
-    audioBitsPerSecond:192000
-   });
-   subtitleRecorder.ondataavailable=e=>{if(e.data&&e.data.size)subtitleChunks.push(e.data)};
-   subtitleRecorder.onstop=async()=>{
-    const rawBlob=new Blob(subtitleChunks,{type:mime});
-    let blob=rawBlob;
-    setExportProgress("subtitles",0);
-    try{
-     blob=await makeCapCutCompatible(rawBlob,"subtitles",16000000,false);
-    }catch(subtitleError){
-     console.error("SUBTITLE CONVERSION",subtitleError);
-     warn("СУБТИТРЫ СОХРАНЕНЫ В ИСХОДНОМ MP4: CAPCUT-КОДИРОВАНИЕ НЕДОСТУПНО.");
-    }
-    setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_black_2160x3840_${activeRecordingStamp}.mp4`);
-    subtitleChunks=[];
-    subtitleRecorder=null;
-    completeExportJob("subtitles");
-   };
-  }catch(subtitleRecorderError){
-   console.error("SUBTITLE RECORDER",subtitleRecorderError);
-   subtitleRecorder=null;
-   activeExportJobs=1;
-   exportProgress={avatar:0};
-   warn("ОТДЕЛЬНАЯ ЗАПИСЬ СУБТИТРОВ НЕ ПОДДЕРЖИВАЕТСЯ ЭТИМ БРАУЗЕРОМ.");
-  }
- }
 
  recorder.onstop=async()=>{
+  stopTracks(avatarVideoTracks);
   const rawBlob=new Blob(chunks,{type:mime});
   let blob=rawBlob;
   if(recordsSubtitles){
@@ -1204,10 +1252,10 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
   chunks=[];
   recorder=null;
   completeExportJob("avatar");
+  if(recordsSubtitles)startSubtitleReplayRecording(mime,activeRecordingStamp);
  };
 
- // Оба холста начинают запись до старта звука и останавливаются в один момент — тайминг совпадает.
- if(subtitleRecorder)subtitleRecorder.start(1000);
+ // На мобильном устройстве пишется только один видеопоток за раз.
  recorder.start(1000);
  if(el.teleprompterInput.value.trim())openTeleprompter(true);
 
