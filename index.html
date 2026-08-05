@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>@danyapez</title>
-<link rel="preconnect" href="https://innoai-edge-tts-text-to-speech.hf.space" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -549,16 +548,10 @@ let edgeTTSWarmup=null;
 
 function warmEdgeTTS(){
  if(!edgeTTSWarmup){
-  edgeTTSWarmup=Promise.allSettled([
-   fetch(EDGE_TTS_ORIGIN,{mode:"no-cors",cache:"no-store",keepalive:true}),
-   fetch(`${EDGE_TTS_ORIGIN}gradio_api/info`,{mode:"no-cors",cache:"no-store",keepalive:true})
-  ]);
+  edgeTTSWarmup=fetch(EDGE_TTS_ORIGIN,{mode:"no-cors",cache:"no-store",keepalive:true}).catch(()=>null);
  }
  return edgeTTSWarmup;
 }
-
-// Начинаем подключение сразу при разборе страницы, а не после загрузки спрайтов.
-void warmEdgeTTS();
 
 async function edgeTTSFetch(url,options={},attempts=3,timeoutMs=120000){
  let lastError;
@@ -672,8 +665,6 @@ function finishAI(){
  releaseScreenAwake();
  restoreAISpeakerOutput();
  if(aiRobotOscillator){try{aiRobotOscillator.stop()}catch(error){}try{aiRobotOscillator.disconnect()}catch(error){}aiRobotOscillator=null}
- if(aiAudioSource){try{aiAudioSource.disconnect()}catch(error){}}
- if(aiRecordingDestination){stopMediaTracks(aiRecordingDestination.stream.getTracks());aiRecordingDestination=null}
  aiMode=false;aiStopRequested=false;aiAudioSource=null;aiMotionTime=0;aiExpressionTime=0;
  aiEnvelope=null;aiLastEnergy=0;aiProcessingLatency=0;
  aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;aiSubtitleCues=[];aiSubtitleText="";
@@ -1093,10 +1084,6 @@ function resetDownloadLink(link){
  link.setAttribute("aria-disabled","true");
 }
 
-function stopMediaTracks(tracks){
- for(const track of tracks||[]){try{track.stop()}catch(error){}}
-}
-
 function setDownloadLink(link,blob,filename){
  link.href=URL.createObjectURL(blob);
  link.download=filename;
@@ -1140,7 +1127,6 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  const settings=exportSettings();
  const videoStream=recCanvas.captureStream(30);
- const avatarVideoTracks=videoStream.getVideoTracks();
  // Обычный REC пишет исходный трек микрофона — это самый совместимый вариант.
  // REC AI передаёт сюда отдельный синтезированный аудиотрек через audioTracksOverride.
  const audioTracks=audioTracksOverride!==null
@@ -1153,32 +1139,25 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  // Один поток: canvas-видео + микрофон. Так звук и видео стартуют вместе.
  const mixedStream=new MediaStream([
-  ...avatarVideoTracks,
+  ...videoStream.getVideoTracks(),
   ...audioTracks
  ]);
 
- try{
-  recorder=new MediaRecorder(mixedStream,{
-   mimeType:mime,
-   videoBitsPerSecond:settings.br,
-   audioBitsPerSecond:192000
-  });
- }catch(recorderError){
-  stopMediaTracks(avatarVideoTracks);
-  throw recorderError;
- }
+ recorder=new MediaRecorder(mixedStream,{
+  mimeType:mime,
+  videoBitsPerSecond:settings.br,
+  audioBitsPerSecond:192000
+ });
  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
 
  const recordsSubtitles=tag.startsWith("AI_");
- let subtitleVideoTracks=[];
  activeExportJobs=recordsSubtitles?2:1;
  exportProgress=recordsSubtitles?{avatar:0,subtitles:0}:{avatar:0};
  if(recordsSubtitles){
   try{
    renderSubtitles(sctx,subtitleCanvas.width,subtitleCanvas.height);
    const subtitleVideoStream=subtitleCanvas.captureStream(30);
-   subtitleVideoTracks=subtitleVideoStream.getVideoTracks();
-   const subtitleStream=new MediaStream(subtitleVideoTracks);
+   const subtitleStream=new MediaStream(subtitleVideoStream.getVideoTracks());
    subtitleRecorder=new MediaRecorder(subtitleStream,{
     mimeType:mime,
     videoBitsPerSecond:16000000,
@@ -1186,7 +1165,6 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
    });
    subtitleRecorder.ondataavailable=e=>{if(e.data&&e.data.size)subtitleChunks.push(e.data)};
    subtitleRecorder.onstop=async()=>{
-    stopMediaTracks(subtitleVideoTracks);
     const rawBlob=new Blob(subtitleChunks,{type:mime});
     let blob=rawBlob;
     setExportProgress("subtitles",0);
@@ -1197,11 +1175,11 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
      warn("СУБТИТРЫ СОХРАНЕНЫ В ИСХОДНОМ MP4: CAPCUT-КОДИРОВАНИЕ НЕДОСТУПНО.");
     }
     setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_black_2160x3840_${activeRecordingStamp}.mp4`);
+    subtitleChunks=[];
     subtitleRecorder=null;
     completeExportJob("subtitles");
    };
   }catch(subtitleRecorderError){
-   stopMediaTracks(subtitleVideoTracks);
    console.error("SUBTITLE RECORDER",subtitleRecorderError);
    subtitleRecorder=null;
    activeExportJobs=1;
@@ -1211,7 +1189,6 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
  }
 
  recorder.onstop=async()=>{
-  stopMediaTracks(avatarVideoTracks);
   const rawBlob=new Blob(chunks,{type:mime});
   let blob=rawBlob;
   if(recordsSubtitles){
@@ -1224,6 +1201,7 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
    }
   }
   setDownloadLink(el.downloadZip,blob,`danyapez_avatar_${tag}_${settings.label.replace("×","x")}_${activeRecordingStamp}.mp4`);
+  chunks=[];
   recorder=null;
   completeExportJob("avatar");
  };
