@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:"Press Start 2P",monospace;font-size:11px}
 .app{min-height:100svh;display:grid;grid-template-columns:minmax(0,1fr) 400px;background:#000}
 .stage{position:relative;display:grid;place-items:center;min-height:100svh;background:#000;overflow:hidden}
@@ -48,6 +49,8 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 #voiceFxToggle.active{background:#7741F6;border-color:#7741F6}
 .small-note{color:#777;font:11px/1.45 Arial,sans-serif}
 .teleprompter-editor textarea{width:100%;min-height:120px;resize:vertical;border:1px solid rgba(255,255,255,.35);background:#000;color:#fff;padding:12px;font:10px/1.9 "Press Start 2P",monospace}
+.teleprompter-estimate{display:flex;justify-content:space-between;gap:10px;color:#8f8f8f;font:12px/1.4 Arial,sans-serif;font-variant-numeric:tabular-nums}
+.teleprompter-estimate span:first-child{color:#7741F6;font-weight:700}
 .teleprompter-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .rec-grid{display:grid;grid-template-columns:1fr;gap:9px}
 #aiRec.active{background:#7741F6;border-color:#7741F6}
@@ -68,6 +71,7 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
  .panel{border-left:0;border-top:1px solid rgba(255,255,255,.25);min-height:62svh;padding:14px;padding-bottom:max(14px,env(safe-area-inset-bottom))}
  #camera{width:130px;right:10px;bottom:10px}
  h1{font-size:12px} button,a,select{font-size:7px;padding:12px 9px}
+ .teleprompter-editor textarea{font:16px/1.55 Arial,sans-serif}
  .teleprompter-reader{top:4px;height:225px}
  .teleprompter-text{font-size:14px}
 }
@@ -94,7 +98,9 @@ input[type=checkbox]{margin:0;width:13px;height:13px;accent-color:#fff}
 <div class="teleprompter-editor" id="teleprompterEditor">
 <div class="block-title">ТЕЛЕСУФЛЁР</div>
 <textarea id="teleprompterInput" placeholder="Вставьте сюда текст и нажмите ЗАПИСЬ."></textarea>
+<div class="teleprompter-estimate" aria-live="polite"><span id="teleprompterEstimate">ПРИМЕРНО: 0 СЕК</span><span id="teleprompterWordCount">0 СЛОВ</span></div>
 <button id="teleprompterDelete" type="button">УДАЛИТЬ ТЕКСТ</button>
+<button id="teleprompterPaste" class="hidden" type="button">ВСТАВИТЬ ТЕКСТ</button>
 </div>
 
 <div class="teleprompter-reader hidden" id="teleprompterReader">
@@ -141,6 +147,9 @@ const GREEN="#00FF00";
 const SUBTITLE_BACKGROUND="#000000";
 const AUDIO_SAMPLE_RATE=48000;
 const AUDIO_SETTINGS={echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:{ideal:AUDIO_SAMPLE_RATE},channelCount:{ideal:1}};
+const MOBILE_DEVICE=navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const LOW_MEMORY_DEVICE=Number(navigator.deviceMemory)>0&&Number(navigator.deviceMemory)<=4;
+const SAFE_EXPORT_MODE=MOBILE_DEVICE||LOW_MEMORY_DEVICE;
 
 const preview=document.querySelector("#preview");
 const pctx=preview.getContext("2d",{alpha:false});
@@ -149,6 +158,7 @@ const rctx=recCanvas.getContext("2d",{alpha:false});
 const subtitleCanvas=document.createElement("canvas");
 const sctx=subtitleCanvas.getContext("2d",{alpha:false});
 const video=document.querySelector("#camera");
+if(SAFE_EXPORT_MODE){preview.width=1280;preview.height=720}
 
 const el={
  start:document.querySelector("#start"),
@@ -174,7 +184,10 @@ const el={
  teleprompterEditor:document.querySelector("#teleprompterEditor"),
  teleprompterReader:document.querySelector("#teleprompterReader"),
  teleprompterInput:document.querySelector("#teleprompterInput"),
+ teleprompterEstimate:document.querySelector("#teleprompterEstimate"),
+ teleprompterWordCount:document.querySelector("#teleprompterWordCount"),
  teleprompterDelete:document.querySelector("#teleprompterDelete"),
+ teleprompterPaste:document.querySelector("#teleprompterPaste"),
  teleprompterClose:document.querySelector("#teleprompterClose"),
  teleprompterScroll:document.querySelector("#teleprompterScroll"),
  teleprompterText:document.querySelector("#teleprompterText"),
@@ -195,6 +208,8 @@ let aiMutedMicTracks=[],audioSessionBeforeAI=null;
 let recorder=null,chunks=[],subtitleRecorder=null,subtitleChunks=[],lastVideoTime=-1,nextRecRender=0,activeRecordingStamp="",activeExportJobs=0,exportProgress={};
 let subtitleReplayActive=false,subtitleReplayStartAt=0,subtitleReplayStopQueued=false;
 let screenWakeLock=null,screenWakeLockWanted=false;
+let memoryCleanupTimer=null;
+const downloadCleanupTimers=new WeakMap();
 let stable="static", current="static", since=performance.now();
 let cameraReady=false;
 let head={x:0,y:0}, smoothHead={x:0,y:0};
@@ -223,7 +238,7 @@ function releaseScreenAwake(){
 }
 
 function exportSettings(){
- return {w:1920,h:1080,br:12000000,label:"1920×1080"};
+ return {w:1920,h:1080,br:SAFE_EXPORT_MODE?8000000:12000000,label:"1920×1080"};
 }
 
 function resizeRec(){
@@ -611,6 +626,7 @@ async function renderAIVoiceOffline(samples,sampleRate){
  const offline=new OfflineContext(1,Math.ceil((inputDuration+.24)*AUDIO_SAMPLE_RATE),AUDIO_SAMPLE_RATE);
  const inputBuffer=offline.createBuffer(1,samples.length,sampleRate);
  inputBuffer.getChannelData(0).set(samples);
+ samples=null;
  const source=offline.createBufferSource();source.buffer=inputBuffer;
 
  // Те же AI-эффекты, но они считаются заранее и не могут заикаться во время записи.
@@ -654,7 +670,8 @@ async function renderAIVoiceOffline(samples,sampleRate){
 
  source.start(0);robotOscillator.start(0);robotOscillator.stop(inputDuration+.24);
  const rendered=await offline.startRendering();
- return {samples:new Float32Array(rendered.getChannelData(0)),sampleRate:rendered.sampleRate};
+ // Возвращаем сам AudioBuffer без второй полной копии звука в памяти.
+ return rendered;
 }
 
 async function buildAIVoiceGraph(source){
@@ -669,9 +686,22 @@ async function buildAIVoiceGraph(source){
 function finishAI(){
  releaseScreenAwake();
  restoreAISpeakerOutput();
+ const finishedSource=aiAudioSource;
+ aiAudioSource=null;
+ if(finishedSource){
+  try{finishedSource.stop()}catch(error){}
+  try{finishedSource.disconnect()}catch(error){}
+  try{finishedSource.buffer=null}catch(error){}
+ }
+ const finishedAnalyser=analyser&&analyser!==micAnalyser?analyser:null;
+ if(finishedAnalyser){try{finishedAnalyser.disconnect()}catch(error){}}
+ if(aiRecordingDestination){
+  stopTracks(aiRecordingDestination.stream?.getTracks?.()||[]);
+  aiRecordingDestination=null;
+ }
  if(aiRobotOscillator){try{aiRobotOscillator.stop()}catch(error){}try{aiRobotOscillator.disconnect()}catch(error){}aiRobotOscillator=null}
  subtitleReplayActive=false;subtitleReplayStartAt=0;subtitleReplayStopQueued=false;
- aiMode=false;aiStopRequested=false;aiAudioSource=null;aiMotionTime=0;aiExpressionTime=0;
+ aiMode=false;aiStopRequested=false;aiMotionTime=0;aiExpressionTime=0;
  aiEnvelope=null;aiLastEnergy=0;aiProcessingLatency=0;
  aiSourceStartAt=0;aiTeleprompterStartAt=0;aiTeleprompterDuration=0;aiTeleprompterWords=[];aiTeleprompterWeights=[];aiTeleprompterTotalWeight=0;aiTeleprompterWordIndex=-1;aiSubtitleCues=[];aiSubtitleText="";
  analyser=micAnalyser;audioData=micAudioData;
@@ -726,10 +756,10 @@ async function startAIRecording(){
 
  const result=await synthesizeText(text);
  setStatus("ОБРАБОТКА AI");
- const processed=await renderAIVoiceOffline(result.samples,result.sampleRate);
- aiEnvelope=buildAIEnvelope(processed.samples,processed.sampleRate);
- const buffer=audioCtx.createBuffer(1,processed.samples.length,processed.sampleRate);
- buffer.getChannelData(0).set(processed.samples);
+ const renderPromise=renderAIVoiceOffline(result.samples,result.sampleRate);
+ result.samples=null;
+ const buffer=await renderPromise;
+ aiEnvelope=buildAIEnvelope(buffer.getChannelData(0),buffer.sampleRate);
  aiAudioSource=audioCtx.createBufferSource();aiAudioSource.buffer=buffer;
  await buildAIVoiceGraph(aiAudioSource);
 
@@ -740,9 +770,14 @@ async function startAIRecording(){
  prepareAISpeakerOutput();
  const started=startRec(aiRecordingDestination.stream.getAudioTracks(),"AI_AGENT_Z");
  if(!started){finishAI();throw new Error("ЗАПИСЬ MP4 НЕ ПОДДЕРЖИВАЕТСЯ.")}
+ updateTeleprompterEditorState(buffer.duration);
  el.aiRec.classList.add("active");el.aiRec.textContent="ЗАПИСЬ";setStatus("ЗАПИСЬ");
 
+ const activeAISource=aiAudioSource;
  aiAudioSource.onended=()=>{
+  if(aiAudioSource===activeAISource)aiAudioSource=null;
+  try{activeAISource.disconnect()}catch(error){}
+  try{activeAISource.buffer=null}catch(error){}
   if(!aiStopRequested)setTimeout(stopActiveRecorders,350);
  };
  await audioCtx.resume();
@@ -781,8 +816,42 @@ function updateAIMotion(now,vol){
  current=stable;
 }
 
+function estimateSpeechDuration(text){
+ const clean=text.trim();
+ if(!clean)return {seconds:0,words:0};
+ const words=clean.match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu)||[];
+ const spokenCharacters=(clean.match(/[\p{L}\p{N}]/gu)||[]).length;
+ const sentences=(clean.match(/[.!?…]+/g)||[]).length;
+ const shortPauses=(clean.match(/[,;:—-]+/g)||[]).length;
+ const lineBreaks=(clean.match(/\n+/g)||[]).length;
+ // Голос генерируется со скоростью +20%. Берём одновременно число слов и
+ // символов, чтобы короткие и длинные русские слова считались одинаково честно.
+ const speech=Math.max(words.length/2.8,spokenCharacters/17.5);
+ const seconds=Math.max(1,Math.ceil(speech+sentences*.22+shortPauses*.09+lineBreaks*.08+.2));
+ return {seconds,words:words.length};
+}
+
+function formatSpeechDuration(totalSeconds){
+ const seconds=Math.max(0,Math.round(totalSeconds));
+ if(seconds<60)return `${seconds} СЕК`;
+ const minutes=Math.floor(seconds/60),rest=seconds%60;
+ return rest?`${minutes} МИН ${rest} СЕК`:`${minutes} МИН`;
+}
+
+function updateTeleprompterEditorState(exactDuration=null){
+ const text=el.teleprompterInput.value;
+ const estimate=estimateSpeechDuration(text);
+ const hasText=!!text.trim();
+ const duration=exactDuration===null?estimate.seconds:Math.max(1,Math.ceil(exactDuration));
+ el.teleprompterEstimate.textContent=`${exactDuration===null?"ПРИМЕРНО":"ТОЧНО"}: ${formatSpeechDuration(duration)}`;
+ el.teleprompterWordCount.textContent=`${estimate.words} СЛОВ`;
+ el.teleprompterDelete.classList.toggle("hidden",!hasText);
+ el.teleprompterPaste.classList.toggle("hidden",hasText);
+}
+
 function saveTeleprompter(){
  localStorage.setItem("danyapezTeleprompterText",el.teleprompterInput.value);
+ updateTeleprompterEditorState();
 }
 
 function prepareAITeleprompter(text){
@@ -840,7 +909,23 @@ function closeTeleprompter(){
  teleprompterActive=false;el.teleprompterReader.classList.add("hidden");el.teleprompterReader.classList.remove("speaking");el.teleprompterEditor.classList.remove("hidden");
 }
 function deleteTeleprompter(){
- el.teleprompterInput.value="";el.teleprompterText.textContent="";localStorage.removeItem("danyapezTeleprompterText");closeTeleprompter();setStatus("TEXT DELETED");
+ el.teleprompterInput.value="";el.teleprompterText.textContent="";localStorage.removeItem("danyapezTeleprompterText");closeTeleprompter();updateTeleprompterEditorState();setStatus("ТЕКСТ УДАЛЁН");
+}
+
+async function pasteTeleprompter(){
+ hideWarn();
+ try{
+  if(!navigator.clipboard?.readText)throw new Error("CLIPBOARD API IS NOT AVAILABLE");
+  const text=await navigator.clipboard.readText();
+  if(!text.trim())throw new Error("БУФЕР ОБМЕНА ПУСТ");
+  el.teleprompterInput.value=text;
+  saveTeleprompter();
+  setStatus("ТЕКСТ ВСТАВЛЕН");
+ }catch(error){
+  console.warn("PASTE",error);
+  warn("БРАУЗЕР НЕ ДАЛ ДОСТУП К БУФЕРУ. НАЖМИТЕ И УДЕРЖИВАЙТЕ ПОЛЕ, ЗАТЕМ ВЫБЕРИТЕ «ВСТАВИТЬ».");
+  try{el.teleprompterInput.focus({preventScroll:true})}catch(_){el.teleprompterInput.focus()}
+ }
 }
 let teleprompterNoiseFloor=.006;
 function updateTeleprompter(vol,now){
@@ -1075,13 +1160,15 @@ async function makeCapCutCompatible(rawBlob,progressKey="file",videoBitrate=1200
  if(requireAudio&&!inputAudioTrack)throw new Error("RECORDED AI AUDIO TRACK IS MISSING");
  const target=new BufferTarget();
  const output=new Output({format:new Mp4OutputFormat(),target});
- const conversionOptions={
-  input,output,tracks:"primary",tags:{},
-  video:{
-   codec:"avc",frameRate:30,bitrate:videoBitrate,keyFrameInterval:2,
-   forceTranscode:true,hardwareAcceleration:"prefer-hardware"
-  }
- };
+ const conversionOptions={input,output,tracks:"primary",tags:{}};
+ // На телефоне не декодируем и не кодируем 1080p/4K заново: это и вызывало
+ // аварийный перезапуск вкладки. Контейнер пересобирается без тяжёлого видеотранскода.
+ conversionOptions.video=SAFE_EXPORT_MODE
+  ?{}
+  :{
+    codec:"avc",frameRate:30,bitrate:videoBitrate,keyFrameInterval:2,
+    forceTranscode:true,hardwareAcceleration:"prefer-hardware"
+   };
  if(inputAudioTrack)conversionOptions.audio={
    codec:"aac",sampleRate:AUDIO_SAMPLE_RATE,numberOfChannels:1,
    bitrate:192000,forceTranscode:true
@@ -1097,6 +1184,8 @@ async function makeCapCutCompatible(rawBlob,progressKey="file",videoBitrate=1200
 }
 
 function resetDownloadLink(link){
+ const cleanupTimer=downloadCleanupTimers.get(link);
+ if(cleanupTimer){clearTimeout(cleanupTimer);downloadCleanupTimers.delete(link)}
  const oldUrl=link.getAttribute("href");
  if(oldUrl?.startsWith("blob:"))URL.revokeObjectURL(oldUrl);
  link.removeAttribute("href");
@@ -1104,9 +1193,44 @@ function resetDownloadLink(link){
 }
 
 function setDownloadLink(link,blob,filename){
+ resetDownloadLink(link);
  link.href=URL.createObjectURL(blob);
  link.download=filename;
  link.setAttribute("aria-disabled","false");
+}
+
+function releaseDownloadedFileLater(link){
+ const url=link.getAttribute("href");
+ if(!url?.startsWith("blob:"))return;
+ const previousTimer=downloadCleanupTimers.get(link);
+ if(previousTimer)clearTimeout(previousTimer);
+ // Загрузке даётся время забрать Blob, затем его большая копия удаляется из RAM.
+ const timer=setTimeout(()=>{
+  downloadCleanupTimers.delete(link);
+  if(link.getAttribute("href")!==url)return;
+  URL.revokeObjectURL(url);
+  link.removeAttribute("href");
+  link.setAttribute("aria-disabled","true");
+  scheduleMemoryCleanup();
+ },90000);
+ downloadCleanupTimers.set(link,timer);
+}
+
+function cleanFinishedMediaMemory(){
+ if(activeExportJobs||recorder?.state==="recording"||subtitleRecorder?.state==="recording")return;
+ chunks.length=0;
+ subtitleChunks.length=0;
+ if(recCanvas.width!==1||recCanvas.height!==1){recCanvas.width=1;recCanvas.height=1}
+ if(subtitleCanvas.width!==1||subtitleCanvas.height!==1){subtitleCanvas.width=1;subtitleCanvas.height=1}
+}
+
+function scheduleMemoryCleanup(delay=180){
+ if(memoryCleanupTimer)clearTimeout(memoryCleanupTimer);
+ memoryCleanupTimer=setTimeout(()=>{
+  memoryCleanupTimer=null;
+  if("requestIdleCallback" in window)requestIdleCallback(cleanFinishedMediaMemory,{timeout:800});
+  else cleanFinishedMediaMemory();
+ },delay);
 }
 
 function stopTracks(tracks){
@@ -1115,10 +1239,12 @@ function stopTracks(tracks){
 
 function startSubtitleReplayRecording(mime,recordingStamp){
  let subtitleTracks=[];
+ const subtitleWidth=SAFE_EXPORT_MODE?1080:2160;
+ const subtitleHeight=SAFE_EXPORT_MODE?1920:3840;
  try{
   subtitleChunks=[];
-  subtitleCanvas.width=2160;
-  subtitleCanvas.height=3840;
+  subtitleCanvas.width=subtitleWidth;
+  subtitleCanvas.height=subtitleHeight;
   subtitleReplayActive=true;
   subtitleReplayStopQueued=false;
   subtitleReplayStartAt=performance.now()+280;
@@ -1130,7 +1256,7 @@ function startSubtitleReplayRecording(mime,recordingStamp){
   subtitleTracks=subtitleVideoStream.getVideoTracks();
   subtitleRecorder=new MediaRecorder(new MediaStream(subtitleTracks),{
    mimeType:mime,
-   videoBitsPerSecond:16000000,
+   videoBitsPerSecond:SAFE_EXPORT_MODE?7000000:16000000,
    audioBitsPerSecond:192000
   });
   subtitleRecorder.ondataavailable=event=>{
@@ -1139,19 +1265,21 @@ function startSubtitleReplayRecording(mime,recordingStamp){
   subtitleRecorder.onstop=async()=>{
    subtitleReplayActive=false;
    stopTracks(subtitleTracks);
-   const rawBlob=new Blob(subtitleChunks,{type:mime});
+   let rawBlob=new Blob(subtitleChunks,{type:mime});
+   subtitleChunks.length=0;
    subtitleCanvas.width=1;
    subtitleCanvas.height=1;
    let blob=rawBlob;
    setExportProgress("subtitles",.65);
    try{
-    blob=await makeCapCutCompatible(rawBlob,"subtitles",16000000,false,.65);
+    blob=await makeCapCutCompatible(rawBlob,"subtitles",SAFE_EXPORT_MODE?7000000:16000000,false,.65);
    }catch(subtitleError){
     console.error("SUBTITLE CONVERSION",subtitleError);
     warn("СУБТИТРЫ СОХРАНЕНЫ В ИСХОДНОМ MP4: CAPCUT-КОДИРОВАНИЕ НЕДОСТУПНО.");
    }
-   setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_black_2160x3840_${recordingStamp}.mp4`);
-   subtitleChunks=[];
+   setDownloadLink(el.downloadSubtitles,blob,`danyapez_subtitles_black_${subtitleWidth}x${subtitleHeight}_${recordingStamp}.mp4`);
+   blob=null;
+   rawBlob=null;
    subtitleRecorder=null;
    completeExportJob("subtitles");
   };
@@ -1178,6 +1306,7 @@ function completeExportJob(progressKey){
  el.stop.disabled=true;
  if(aiMode)finishAI();
  setStatus("READY");
+ scheduleMemoryCleanup();
 }
 
 function stopActiveRecorders(){
@@ -1237,7 +1366,8 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 
  recorder.onstop=async()=>{
   stopTracks(avatarVideoTracks);
-  const rawBlob=new Blob(chunks,{type:mime});
+  let rawBlob=new Blob(chunks,{type:mime});
+  chunks.length=0;
   let blob=rawBlob;
   if(recordsSubtitles){
    setExportProgress("avatar",0);
@@ -1249,10 +1379,16 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
    }
   }
   setDownloadLink(el.downloadZip,blob,`danyapez_avatar_${tag}_${settings.label.replace("×","x")}_${activeRecordingStamp}.mp4`);
-  chunks=[];
+  blob=null;
+  rawBlob=null;
   recorder=null;
+  recCanvas.width=1;
+  recCanvas.height=1;
   completeExportJob("avatar");
-  if(recordsSubtitles)startSubtitleReplayRecording(mime,activeRecordingStamp);
+  if(recordsSubtitles){
+   const subtitleStamp=activeRecordingStamp;
+   setTimeout(()=>startSubtitleReplayRecording(mime,subtitleStamp),SAFE_EXPORT_MODE?350:80);
+  }
  };
 
  // На мобильном устройстве пишется только один видеопоток за раз.
@@ -1270,7 +1406,10 @@ function startRec(audioTracksOverride=null,tag="AGENT_Z"){
 el.teleprompterInput.value=localStorage.getItem("danyapezTeleprompterText")||"";
 el.teleprompterInput.addEventListener("input",saveTeleprompter);
 el.teleprompterDelete.onclick=deleteTeleprompter;
+el.teleprompterPaste.onclick=pasteTeleprompter;
 el.teleprompterClose.onclick=closeTeleprompter;
+updateTeleprompterEditorState();
+[el.downloadZip,el.downloadSubtitles].forEach(link=>link.addEventListener("click",()=>releaseDownloadedFileLater(link)));
 document.addEventListener("visibilitychange",()=>{
  if(document.visibilityState==="visible"&&screenWakeLockWanted)void keepScreenAwake();
 });
